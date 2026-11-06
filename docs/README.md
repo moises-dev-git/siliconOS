@@ -50,7 +50,7 @@ do livro e depois o documento correspondente.
 | [06: Paginação](06-paginacao.md) | Endereços virtuais, tabelas de 4 níveis, TLB, as tabelas do kernel | 7 | ✅ |
 | [07: Heap](07-heap.md) | `Box`, `Vec`, `String` dentro do kernel: alocadores bump e lista de blocos livres | 8 | ✅ |
 | [08: Interrupções de hardware](08-interrupcoes-de-hardware.md) | 8259, APIC e ACPI; timer a 100 Hz; teclado PS/2; deadlock | 9 | ✅ |
-| 09: Shell e testes | Shell interativo, testes no QEMU, depuração com GDB | 10 | ⏳ |
+| [09: Shell e testes](09-shell-e-testes.md) | Shell interativo, `cargo test` no QEMU, depuração com GDB | 10 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 
@@ -78,7 +78,12 @@ e abre o QEMU.
 ./run.sh                    # roda normalmente: janela do QEMU + mensagens no terminal
 SEM_TELA=1 ./run.sh         # sem janela; depois de 15 s mostra o que o kernel escreveu
 ./run.sh teste-pagefault    # compila uma versão que provoca um erro de propósito
+cargo test --target x86_64-unknown-uefi   # testes automáticos, dentro do QEMU (doc 09)
+./depurar.sh                # QEMU + GDB conectado, com os nomes das funções (doc 09)
 ```
+
+Com o kernel rodando, clique na janela do QEMU e digite `ajuda` para ver os
+comandos do shell.
 
 Versões de teste disponíveis (cada uma provoca um tipo de erro para provar
 que o kernel o trata):
@@ -108,6 +113,7 @@ que o kernel o trata):
 | `./run.sh teste-print-interrupcao` | `kprint!` dentro do tratador do timer (funciona) | 08 |
 | `./run.sh teste-deadlock` | o mesmo sem a proteção do `kprintln!` (deve travar) | 08 |
 | `./run.sh teste-teclado` | mostra cada scancode recebido do teclado | 08 |
+| `cargo test --target x86_64-unknown-uefi --features teste-que-falha` | inclui um `#[test_case]` que falha (o `cargo test` deve falhar) | 09 |
 
 Para mudar a memória da máquina emulada (padrão: 128 MiB), use `RAM`, por
 exemplo `RAM=4G ./run.sh teste-quadros`.
@@ -120,6 +126,9 @@ exemplo `RAM=4G ./run.sh teste-quadros`.
 siliconos/
 ├── Cargo.toml     Configuração do projeto: dependências e "features" de teste
 ├── run.sh         Compila, copia para esp/ e roda no QEMU
+├── testar.sh      Runner do `cargo test`: roda o .efi de teste no QEMU   [doc 09]
+├── depurar.sh     QEMU com servidor do GDB + GDB com os símbolos         [doc 09]
+├── .cargo/config.toml  diz ao Cargo para usar o testar.sh
 ├── esp/           Pasta que o QEMU apresenta como um pendrive FAT
 │   └── EFI/BOOT/BOOTX64.efi   ← o nosso kernel compilado
 ├── docs/          Esta documentação
@@ -128,6 +137,9 @@ siliconos/
     ├── serial.rs   Escreve na porta serial (canal de depuração)        [doc 01]
     ├── console.rs  Desenha texto na tela, pixel a pixel                [doc 01]
     ├── panic.rs    O que fazer quando o Rust detecta um erro           [doc 02]
+    ├── shell.rs    A linha de comando: edição, tabela de comandos      [doc 09]
+    ├── testes.rs   Framework de testes do `cargo test`                 [doc 09]
+    ├── qemu.rs     Sai do QEMU com código (isa-debug-exit)             [doc 09]
     ├── gdt.rs      Tabela de segmentos e pilha de emergência           [doc 03]
     ├── idt.rs      Tabela de interrupções e tratadores de exceções     [doc 04]
     ├── cpu.rs      cli/sti, sem_interrupcoes, leitura de MSR           [doc 08]
@@ -172,7 +184,8 @@ O fluxo de execução atual, de ponta a ponta:
                ├─ (testes do heap, se compilado com alguma feature de teste)
                ├─ interrupcoes::init()   ACPI, 8259, APICs, timer, teclado e sti
                ├─ (testes de interrupção, se compilado com alguma feature de teste)
-               └─ ecoar_teclado()        dorme (hlt) e mostra cada tecla digitada
+               ├─ (cargo test: rodar_testes() roda os #[test_case] e sai do QEMU)
+               └─ shell::rodar()         dorme (hlt); cada tecla vai para o shell
 ```
 
 ---

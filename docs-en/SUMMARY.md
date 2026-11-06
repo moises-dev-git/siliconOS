@@ -13,6 +13,7 @@
 - [06: Paging](06-paginacao.md)
 - [07: Heap](07-heap.md)
 - [08: Hardware interrupts](08-interrupcoes-de-hardware.md)
+- [09: Shell and tests](09-shell-e-testes.md)
 
 # Reference
 

@@ -361,3 +361,36 @@ pub fn contem(endereco: u64) -> bool {
         None => false,
     }
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+    use alloc::boxed::Box;
+    use alloc::vec::Vec;
+
+    #[test_case]
+    fn alinhar_acima_arredonda() {
+        assert_eq!(alinhar_acima(0, 16), 0);
+        assert_eq!(alinhar_acima(1, 16), 16);
+        assert_eq!(alinhar_acima(16, 16), 16);
+        assert_eq!(alinhar_acima(17, 4096), 4096);
+    }
+
+    #[test_case]
+    fn box_mora_no_heap() {
+        let b = Box::new(7u64);
+        assert!(contem(&*b as *const u64 as u64));
+    }
+
+    #[test_case]
+    fn sem_vazamento_e_blocos_juntados() {
+        let antes = estatisticas();
+        let mut v: Vec<Box<u64>> = (0..1000).map(Box::new).collect();
+        v.retain(|b| **b % 2 == 0); // libera metade, deixando buracos
+        assert_eq!(v.iter().map(|b| **b).sum::<u64>(), (0..1000).filter(|x| x % 2 == 0).sum());
+        drop(v);
+        let depois = estatisticas();
+        assert_eq!(depois.em_uso, antes.em_uso, "vazamento");
+        assert_eq!(depois.blocos_livres, antes.blocos_livres, "buracos nao se juntaram");
+    }
+}

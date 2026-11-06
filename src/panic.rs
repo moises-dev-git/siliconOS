@@ -48,6 +48,14 @@ fn panic(info: &PanicInfo) -> ! {
         let _ = writeln!(con, "Sistema parado.");
     }
 
+    // `cargo test`: um panic é um teste que falhou. Encerrar o QEMU com o
+    // código de falha, para o `cargo test` saber (docs/09-shell-e-testes.md).
+    #[cfg(test)]
+    {
+        let _ = writeln!(Serial, "[FALHOU]");
+        crate::qemu::sair(crate::qemu::Saida::Falha);
+    }
+    #[cfg(not(test))]
     parar();
 }
 

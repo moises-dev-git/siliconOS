@@ -193,3 +193,46 @@ impl Decodificador {
         }
     }
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    /// Passa uma sequência de scancodes e junta os caracteres produzidos.
+    fn digitar(d: &mut Decodificador, scancodes: &[u8]) -> alloc::string::String {
+        scancodes.iter().filter_map(|&s| d.processar(s)).collect()
+    }
+
+    #[test_case]
+    fn letras_e_numeros() {
+        let mut d = Decodificador::new();
+        // a (aperta, solta), 1 (aperta, solta), espaço
+        assert_eq!(digitar(&mut d, &[0x1E, 0x9E, 0x02, 0x82, 0x39, 0xB9]), "a1 ");
+    }
+
+    #[test_case]
+    fn shift_e_caps_lock() {
+        let mut d = Decodificador::new();
+        // Shift esquerdo + a + 1, solta o Shift, a
+        assert_eq!(digitar(&mut d, &[0x2A, 0x1E, 0x02, 0xAA, 0x1E]), "A!a");
+        // Caps Lock liga: letra maiúscula, número continua número
+        assert_eq!(digitar(&mut d, &[0x3A, 0xBA, 0x1E, 0x02]), "A1");
+        // Caps Lock + Shift: letra volta a ser minúscula
+        assert_eq!(digitar(&mut d, &[0x36, 0x1E, 0xB6]), "a");
+        // Caps Lock desliga
+        assert_eq!(digitar(&mut d, &[0x3A, 0xBA, 0x1E]), "a");
+    }
+
+    #[test_case]
+    fn teclas_estendidas_ignoradas() {
+        let mut d = Decodificador::new();
+        // seta direita (E0 4D / E0 CD) não pode virar 'm'... nem nada
+        assert_eq!(digitar(&mut d, &[0xE0, 0x4D, 0xE0, 0xCD, 0x1E]), "a");
+    }
+
+    #[test_case]
+    fn enter_e_backspace() {
+        let mut d = Decodificador::new();
+        assert_eq!(digitar(&mut d, &[0x1C, 0x0E]), "\n\x08");
+    }
+}

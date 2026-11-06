@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)] // permite extern "x86-interrupt" (idt.rs)
+// Framework de testes próprio para `cargo test` (src/testes.rs, docs/09-shell-e-testes.md).
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::testes::executar)]
+#![reexport_test_harness_main = "rodar_testes"]
 
 // A crate `alloc` (Box, Vec, String) passa a existir porque o kernel agora
 // tem um alocador global (src/memoria/heap.rs, docs/07-heap.md).
@@ -15,7 +19,12 @@ mod idt;
 mod interrupcoes;
 mod memoria;
 mod panic;
+#[cfg_attr(not(test), allow(dead_code))] // só o `cargo test` encerra o QEMU
+mod qemu;
 mod serial;
+mod shell;
+#[cfg(test)]
+mod testes;
 
 use core::fmt::Write;
 use spin::Mutex;
@@ -30,6 +39,11 @@ use serial::Serial;
 /// Console global, protegido por um spinlock (ainda não há threads,
 /// mas assim o `kprintln!` pode ser chamado de qualquer lugar com segurança).
 pub static CONSOLE: Mutex<Option<Console>> = Mutex::new(None);
+
+/// Onde o UEFI carregou o nosso .efi (endereço e tamanho). Serve para
+/// depurar com o GDB: os endereços do arquivo começam em 0x1_4000_0000.
+static IMAGEM_BASE: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+static IMAGEM_TAMANHO: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
 /// Imprime na serial E na tela.
 #[macro_export]
@@ -85,6 +99,16 @@ fn main() -> Status {
     // Onde estão as tabelas ACPI (só o UEFI sabe; capítulo 9).
     acpi::guardar_rsdp();
 
+    // Onde o firmware carregou o kernel (para o GDB; doc 09).
+    {
+        use core::sync::atomic::Ordering::Relaxed;
+        use uefi::proto::loaded_image::LoadedImage;
+        let imagem = uefi::boot::open_protocol_exclusive::<LoadedImage>(uefi::boot::image_handle()).unwrap();
+        let (base, tamanho) = imagem.info();
+        IMAGEM_BASE.store(base as u64, Relaxed);
+        IMAGEM_TAMANHO.store(tamanho, Relaxed);
+    }
+
     uefi::println!("Desligando os servicos de boot do UEFI...");
     let memory_map = unsafe { uefi::boot::exit_boot_services(MemoryType::LOADER_DATA) };
 
@@ -104,6 +128,11 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     kprintln!("=== SiliconOS ===");
     kprintln!("Kernel bare-metal iniciado (UEFI desligado).");
     kprintln!("Video: {}x{} (stride {})", fb.width, fb.height, fb.stride);
+    {
+        use core::sync::atomic::Ordering::Relaxed;
+        kprintln!("Imagem do kernel: base {:#x}, {} KiB (no arquivo, a base e 0x140000000)",
+                  IMAGEM_BASE.load(Relaxed), IMAGEM_TAMANHO.load(Relaxed) / 1024);
+    }
 
     // ---- GDT + TSS (docs/03-gdt-e-tss.md) ----
     let antes = gdt::estado();
@@ -166,27 +195,13 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     interrupcoes::init();
     testes_de_interrupcoes();
 
-    kprintln!();
-    kprintln!("Proxima etapa: shell e testes (capitulo 10).");
-    kprintln!("Digite algo (teclado PS/2, layout americano):");
-    ecoar_teclado();
-}
+    // `cargo test`: roda os #[test_case] e encerra o QEMU (não volta).
+    #[cfg(test)]
+    rodar_testes();
 
-/// O laço principal, por enquanto: dorme até chegar uma interrupção; se for
-/// tecla, traduz o scancode e mostra o caractere.
-fn ecoar_teclado() -> ! {
-    use interrupcoes::teclado;
-    let mut decodificador = teclado::Decodificador::new();
-    loop {
-        while let Some(scancode) = teclado::proximo_scancode() {
-            #[cfg(feature = "teste-teclado")]
-            kprintln!("  scancode {:#04x}", scancode);
-            if let Some(c) = decodificador.processar(scancode) {
-                kprint!("{}", c);
-            }
-        }
-        teclado::esperar();
-    }
+    // ---- Shell (docs/09-shell-e-testes.md) ----
+    kprintln!();
+    shell::rodar();
 }
 
 /// Testes das interrupções de hardware:

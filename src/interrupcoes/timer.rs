@@ -115,3 +115,44 @@ pub fn segundos_rtc() -> u8 {
         if inb(0x71) & 0x04 != 0 { s } else { (s >> 4) * 10 + (s & 0x0F) }
     }
 }
+
+/// Hora do relógio CMOS (hora, minuto, segundo), como o firmware a deixou
+/// (no QEMU, a hora UTC do computador hospedeiro).
+pub fn hora_rtc() -> (u8, u8, u8) {
+    fn registrador(n: u8) -> u8 {
+        unsafe { outb(0x70, n); inb(0x71) }
+    }
+    // Esperar o fim de uma atualização (registrador 0x0A, bit 7).
+    while registrador(0x0A) & 0x80 != 0 {}
+    let (mut h, m, s) = (registrador(0x04), registrador(0x02), registrador(0x00));
+    let b = registrador(0x0B);
+    let pm = h & 0x80 != 0; // no formato de 12 horas, o bit 7 da hora = PM
+    h &= 0x7F;
+    let bcd = |v: u8| (v >> 4) * 10 + (v & 0x0F);
+    let (mut h, m, s) = if b & 0x04 != 0 { (h, m, s) } else { (bcd(h), bcd(m), bcd(s)) };
+    if b & 0x02 == 0 {
+        // Formato de 12 horas: 12 AM = 0h, 1-11 PM = 13-23h.
+        h = (h % 12) + if pm { 12 } else { 0 };
+    }
+    (h, m, s)
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test_case]
+    fn tiques_avancam() {
+        let inicio = tiques();
+        while tiques() < inicio + 3 {
+            unsafe { core::arch::asm!("hlt") };
+        }
+        assert!(milissegundos() >= 30);
+    }
+
+    #[test_case]
+    fn hora_rtc_valida() {
+        let (h, m, s) = hora_rtc();
+        assert!(h < 24 && m < 60 && s < 60, "{}:{}:{}", h, m, s);
+    }
+}

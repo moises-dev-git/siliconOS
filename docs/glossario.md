@@ -245,6 +245,50 @@ baixo.
 **QEMU**
 : Emulador de PC. Roda o SiliconOS numa janela e reinicia em segundos.
 
+**Shell**
+: O programa que lê uma linha de comando, a interpreta e executa. No
+SiliconOS, roda dentro do kernel (doc 09).
+
+**CPUID**
+: Instrução com que um programa pergunta à CPU o fabricante, o modelo e
+os recursos que ela tem.
+
+**FADT**
+: Tabela ACPI (assinatura `"FACP"`) com as portas de controle de energia e
+o endereço do DSDT.
+
+**DSDT / AML**
+: O DSDT é uma tabela ACPI que contém um programa em AML (*ACPI Machine
+Language*), um *bytecode* que descreve dispositivos e ações, como o código
+do estado S5 (desligado).
+
+**S5** (*soft off*)
+: O estado ACPI "desligado por software". Entra-se nele escrevendo o código
+do S5 e o bit SLP_EN no registrador PM1 control.
+
+**`isa-debug-exit`**
+: Dispositivo do QEMU para testes: escrever V na porta dele encerra o QEMU
+com o código `(V << 1) | 1`.
+
+**GDB**
+: O depurador do GNU. Com o QEMU iniciado com `-s`, ele se conecta à CPU
+emulada pela porta TCP 1234.
+
+**Breakpoint**
+: Um ponto do código em que o depurador para a execução.
+
+**Tabela de símbolos**
+: A lista nome → endereço das funções de um executável. É o que permite ao
+depurador mostrar `siliconos::shell::executar` em vez de um número.
+
+**Nome mutilado** (*mangled name*)
+: O nome que o compilador dá a uma função no executável, codificando o
+caminho completo (ex.: `_RNvNtCs..._9siliconos5shell8executar`).
+
+**Relocation**
+: Uma correção de endereço que o carregador aplica quando o executável é
+posto num endereço diferente do previsto no arquivo (o *ImageBase*).
+
 ---
 
 ## Privilégio e proteção

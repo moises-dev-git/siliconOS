@@ -394,3 +394,38 @@ pub fn alocar_e_mapear(virt: u64, bits: u64) -> Result<Quadro, ErroMapeamento> {
     mapear(virt, q.endereco(), TamanhoPagina::K4, bits)?;
     Ok(q)
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test_case]
+    fn pagina_zero_nao_mapeada() {
+        assert!(traduzir(0).is_none());
+        assert!(traduzir(0xFFF).is_none());
+    }
+
+    #[test_case]
+    fn metade_alta_mostra_a_ram() {
+        let t = traduzir(DESLOCAMENTO_FISICO + 0x20_0000).expect("metade alta");
+        assert_eq!(t.fisico, 0x20_0000);
+    }
+
+    #[test_case]
+    fn mapear_e_desmapear() {
+        const V: u64 = 0x0000_6000_0000_0000;
+        let q = alocar_e_mapear(V, flags::ESCRITA).expect("mapear");
+        unsafe { (V as *mut u64).write_volatile(0xABCD) };
+        let pelo_fisico = fisico_para_virtual(q.endereco()) as *const u64;
+        assert_eq!(unsafe { pelo_fisico.read_volatile() }, 0xABCD);
+        assert_eq!(desmapear(V), Ok(q.endereco()));
+        assert!(traduzir(V).is_none());
+        quadros::liberar(q);
+    }
+
+    #[test_case]
+    fn erros_de_mapeamento() {
+        assert_eq!(mapear(0x8000_0000_0000_0000, 0, TamanhoPagina::K4, 0), Err(ErroMapeamento::NaoCanonico));
+        assert_eq!(mapear(0x0000_6000_0000_0008, 0, TamanhoPagina::K4, 0), Err(ErroMapeamento::Desalinhado));
+    }
+}

@@ -57,3 +57,48 @@ pub fn ler_msr(numero: u32) -> u64 {
     }
     (alto as u64) << 32 | baixo as u64
 }
+
+/// Reinicia a máquina. Primeiro pelo jeito do PC AT: o controlador do
+/// teclado (8042) também controla a linha de RESET da CPU, e o comando 0xFE
+/// dá um pulso nela. Se não funcionar, provoca um triple fault de propósito:
+/// uma IDT vazia, e qualquer interrupção vira double fault e depois triple
+/// fault, que reinicia a CPU.
+pub fn reiniciar() -> ! {
+    use crate::serial::{inb, outb};
+    desligar_interrupcoes();
+    unsafe {
+        while inb(0x64) & 0b10 != 0 {} // esperar o controlador aceitar comando
+        outb(0x64, 0xFE);
+    }
+    // Ainda aqui? Plano B: triple fault.
+    let idt_vazia = crate::gdt::PonteiroTabela { limite: 0, base: 0 };
+    unsafe {
+        asm!("lidt [{}]", "int3", in(reg) &idt_vazia, options(noreturn));
+    }
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test_case]
+    fn sem_interrupcoes_restaura_o_estado() {
+        assert!(interrupcoes_ligadas(), "os testes rodam com as interrupcoes ligadas");
+        let dentro = sem_interrupcoes(|| interrupcoes_ligadas());
+        assert!(!dentro);
+        assert!(interrupcoes_ligadas());
+        // Aninhado: o de dentro não pode religar antes da hora.
+        sem_interrupcoes(|| {
+            sem_interrupcoes(|| {});
+            assert!(!interrupcoes_ligadas());
+        });
+        assert!(interrupcoes_ligadas());
+    }
+
+    #[test_case]
+    fn msr_do_apic() {
+        let base = ler_msr(0x1B);
+        assert_eq!(base & 0xFFFF_F000, 0xFEE0_0000);
+        assert!(base & (1 << 11) != 0);
+    }
+}

@@ -59,7 +59,7 @@ book and then the matching document.
 | [06: Paging](06-paginacao.md) | Virtual addresses, 4-level tables, TLB, the kernel's tables | 7 | ✅ |
 | [07: Heap](07-heap.md) | `Box`, `Vec`, `String` inside the kernel: bump and free-list allocators | 8 | ✅ |
 | [08: Hardware interrupts](08-interrupcoes-de-hardware.md) | 8259, APIC and ACPI; 100 Hz timer; PS/2 keyboard; deadlock | 9 | ✅ |
-| 09: Shell and tests | Interactive shell, tests in QEMU, debugging with GDB | 10 | ⏳ |
+| [09: Shell and tests](09-shell-e-testes.md) | Interactive shell, `cargo test` in QEMU, debugging with GDB | 10 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 
@@ -87,7 +87,12 @@ the `esp/` folder and starts QEMU.
 ./run.sh                    # normal run: QEMU window + messages in the terminal
 SEM_TELA=1 ./run.sh         # no window; after 15 s shows what the kernel wrote
 ./run.sh teste-pagefault    # builds a version that causes an error on purpose
+cargo test --target x86_64-unknown-uefi   # automated tests, inside QEMU (doc 09)
+./depurar.sh                # QEMU + connected GDB, with function names (doc 09)
 ```
+
+With the kernel running, click on the QEMU window and type `ajuda` ("help")
+to see the shell's commands.
 
 (`SEM_TELA` means "no screen"; `teste` means "test".)
 
@@ -119,6 +124,7 @@ kernel handles it):
 | `./run.sh teste-print-interrupcao` | `kprint!` inside the timer handler (works) | 08 |
 | `./run.sh teste-deadlock` | the same without `kprintln!`'s protection (must freeze) | 08 |
 | `./run.sh teste-teclado` | shows every scancode received from the keyboard | 08 |
+| `cargo test --target x86_64-unknown-uefi --features teste-que-falha` | includes a `#[test_case]` that fails (`cargo test` must fail) | 09 |
 
 To change the emulated machine's memory (default: 128 MiB), use `RAM`, for
 example `RAM=4G ./run.sh teste-quadros`.
@@ -131,6 +137,9 @@ example `RAM=4G ./run.sh teste-quadros`.
 siliconos/
 ├── Cargo.toml     Project configuration: dependencies and test "features"
 ├── run.sh         Builds, copies to esp/ and runs in QEMU
+├── testar.sh      `cargo test` runner: runs the test .efi in QEMU        [doc 09]
+├── depurar.sh     QEMU with GDB server + GDB with the symbols            [doc 09]
+├── .cargo/config.toml  tells Cargo to use testar.sh
 ├── esp/           Folder that QEMU presents as a FAT USB stick
 │   └── EFI/BOOT/BOOTX64.efi   ← our compiled kernel
 ├── docs/          This documentation (Portuguese); docs-en/ is the English one
@@ -139,6 +148,9 @@ siliconos/
     ├── serial.rs   Writes to the serial port (debug channel)           [doc 01]
     ├── console.rs  Draws text on the screen, pixel by pixel            [doc 01]
     ├── panic.rs    What to do when Rust detects an error               [doc 02]
+    ├── shell.rs    The command line: editing, command table            [doc 09]
+    ├── testes.rs   ("tests") the `cargo test` framework                [doc 09]
+    ├── qemu.rs     Exits QEMU with a code (isa-debug-exit)             [doc 09]
     ├── gdt.rs      Segment table and emergency stack                   [doc 03]
     ├── idt.rs      Interrupt table and exception handlers              [doc 04]
     ├── cpu.rs      cli/sti, sem_interrupcoes, reading MSRs             [doc 08]
@@ -183,7 +195,8 @@ The current execution flow, end to end:
                ├─ (heap tests, if built with a test feature)
                ├─ interrupcoes::init()   ACPI, 8259, APICs, timer, keyboard and sti
                ├─ (interrupt tests, if built with a test feature)
-               └─ ecoar_teclado()        sleeps (hlt) and shows each key typed
+               ├─ (cargo test: rodar_testes() runs the #[test_case]s and exits QEMU)
+               └─ shell::rodar()         sleeps (hlt); each key goes to the shell
 ```
 
 ---

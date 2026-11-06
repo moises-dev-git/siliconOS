@@ -30,7 +30,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | Paging | `src/memoria/paginacao.rs` | [06](docs-en/06-paginacao.md) |
 | Heap: free list, grows on demand, NX pages | `src/memoria/heap.rs` | [07](docs-en/07-heap.md) |
 | Hardware interrupts: APIC via ACPI, 100 Hz timer, PS/2 keyboard | `src/interrupcoes/`, `src/acpi.rs` | [08](docs-en/08-interrupcoes-de-hardware.md) |
-| Interactive shell and tests | — | in progress |
+| Shell, `cargo test` inside QEMU, debugging with GDB | `src/shell.rs`, `src/testes.rs` | [09](docs-en/09-shell-e-testes.md) |
 
 ## Running
 
@@ -41,6 +41,8 @@ Requires Rust nightly with the `x86_64-unknown-uefi` target, QEMU and OVMF
 ./run.sh                  # builds and opens it in QEMU
 SEM_TELA=1 ./run.sh       # no window, shows the serial output
 ./run.sh teste-pagefault  # test builds: see docs-en/README.md
+cargo test --target x86_64-unknown-uefi   # automated tests inside QEMU
+./depurar.sh              # QEMU + GDB
 ```
 
 The site is generated with [mdBook](https://rust-lang.github.io/mdBook/)

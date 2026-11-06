@@ -203,3 +203,18 @@ pub fn liberar(quadro: Quadro) {
 pub fn livres() -> usize {
     QUADROS.lock().as_ref().map_or(0, |a| a.livres())
 }
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test_case]
+    fn alocar_e_liberar_devolve_a_contagem() {
+        let antes = livres();
+        let q = alocar().expect("sem quadros");
+        assert_eq!(q.endereco() % super::super::TAMANHO_QUADRO, 0);
+        assert_eq!(livres(), antes - 1);
+        liberar(q);
+        assert_eq!(livres(), antes);
+    }
+}

@@ -26,7 +26,7 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Paginação | `src/memoria/paginacao.rs` | [06](docs/06-paginacao.md) |
 | Heap: lista de blocos livres, cresce sob demanda, páginas NX | `src/memoria/heap.rs` | [07](docs/07-heap.md) |
 | Interrupções de hardware: APIC via ACPI, timer a 100 Hz, teclado PS/2 | `src/interrupcoes/`, `src/acpi.rs` | [08](docs/08-interrupcoes-de-hardware.md) |
-| Shell interativo e testes | — | em andamento |
+| Shell, `cargo test` dentro do QEMU, depuração com GDB | `src/shell.rs`, `src/testes.rs` | [09](docs/09-shell-e-testes.md) |
 
 ## Rodar
 
@@ -37,6 +37,8 @@ Requer Rust nightly com o alvo `x86_64-unknown-uefi`, QEMU e OVMF
 ./run.sh                  # compila e abre no QEMU
 SEM_TELA=1 ./run.sh       # sem janela, mostra a saída serial
 ./run.sh teste-pagefault  # versões de teste: veja docs/README.md
+cargo test --target x86_64-unknown-uefi   # testes automáticos no QEMU
+./depurar.sh              # QEMU + GDB
 ```
 
 O site é gerado com [mdBook](https://rust-lang.github.io/mdBook/) a partir de

@@ -1,0 +1,3 @@
+# `cargo test` (e `cargo run`) chamam este script com o caminho do .efi.
+[target.x86_64-unknown-uefi]
+runner = "./testar.sh"

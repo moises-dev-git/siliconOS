@@ -766,3 +766,126 @@ para cada closure usada, sem custo de chamada indireta.
 padrão (`false`, `0`, `None`...). O decodificador do teclado usa
 `if core::mem::take(&mut self.estendido) { ... }` para ler e zerar a
 marca numa operação só.
+
+---
+
+## 31. Ponteiros de função: `fn(...)`
+
+```rust
+pub struct Comando {
+    pub nome: &'static str,
+    pub funcao: fn(&[&str]),
+}
+
+const COMANDOS: &[Comando] = &[
+    Comando { nome: "ajuda", funcao: ajuda },
+];
+
+(comando.funcao)(argumentos);   // chamar
+```
+
+`fn(&[&str])` é o **tipo** "função que recebe uma fatia de `&str` e não
+devolve nada". Um valor desse tipo é só o endereço da função, e o nome de
+qualquer função com essa assinatura serve (`ajuda`, `eco`...). É parecido
+com uma referência de método em Java (`this::ajuda` guardado num
+`Consumer<List<String>>`), mas sem objeto nenhum por trás: não captura
+variáveis e cabe numa `const`.
+
+Os parênteses em `(comando.funcao)(argumentos)` são necessários: sem eles,
+`comando.funcao(argumentos)` procuraria um **método** chamado `funcao`.
+
+A diferença para uma closure ([§16](#16-closures)): a closure pode capturar
+variáveis do lugar onde foi criada; o ponteiro de função, não. Uma closure
+que não captura nada pode ser convertida em `fn`.
+
+---
+
+## 32. `let ... else` e `split_first`
+
+```rust
+let palavras: Vec<&str> = linha.split_whitespace().collect();
+let Some((&nome, argumentos)) = palavras.split_first() else {
+    return; // linha vazia
+};
+// daqui em diante, `nome` e `argumentos` existem
+```
+
+`let PADRÃO = valor else { ... };` tenta encaixar o valor no padrão (como
+um `match` de um braço só). Se encaixar, as variáveis do padrão ficam
+disponíveis **depois** do `let`; se não, roda o bloco `else`, que é
+obrigado a sair dali (`return`, `break`, `panic!`...). É o "retorno
+antecipado" de `if (x == null) return;` em Java, mas o compilador garante
+que, depois dele, o valor existe.
+
+`split_first()` divide uma fatia em `Some((primeiro, resto))`, ou `None` se
+ela estiver vazia. O `&nome` no padrão tira o `&` de fora: `split_first`
+devolve uma referência para o elemento (`&&str`), e o padrão a desfaz para
+termos o `&str` direto.
+
+---
+
+## 33. Testes: `#[cfg(test)]` e `#[test_case]`
+
+```rust
+// no fim de um módulo
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test_case]
+    fn ler_numero_decimal_e_hexadecimal() {
+        assert_eq!(ler_numero("0x2a"), Some(42));
+    }
+}
+```
+
+- **`#[cfg(test)]`**: o item só existe quando o código é compilado pelo
+  `cargo test`. No `cargo build`, o módulo `testes` some do binário. É o
+  mesmo mecanismo das features ([§12](#12-módulos-crates-cargo-e-features)),
+  com a condição `test` ligada automaticamente pelo Cargo.
+- **`use super::*`**: traz tudo do módulo de cima, inclusive o que é
+  privado. Testes no mesmo arquivo podem testar funções internas.
+- Num projeto comum, usa-se `#[test]`. Aqui é **`#[test_case]`**, do
+  framework próprio (doc 09), ligado no `main.rs` por:
+
+```rust
+#![feature(custom_test_frameworks)]                // recurso do nightly
+#![test_runner(crate::testes::executar)]           // quem roda a lista de testes
+#![reexport_test_harness_main = "rodar_testes"]    // nome da função gerada
+```
+
+O compilador junta todas as funções `#[test_case]` do crate numa lista e
+gera `rodar_testes()`, que chama `executar(&[&teste1, &teste2, ...])`.
+
+---
+
+## 34. `dyn Trait` e implementar para todo `T`
+
+```rust
+pub trait Testavel {
+    fn rodar(&self);
+}
+
+impl<T: Fn()> Testavel for T {
+    fn rodar(&self) { /* ... */ self(); /* ... */ }
+}
+
+pub fn executar(testes: &[&dyn Testavel]) { ... }
+```
+
+- **`impl<T: Fn()> Testavel for T`** implementa a trait para **todo tipo**
+  `T` que seja uma função sem parâmetros. Em Java seria como se toda lambda
+  `Runnable` ganhasse automaticamente uma interface nova. Em Rust isso se
+  chama *blanket implementation*.
+- **`&dyn Testavel`** é uma referência para "algum tipo que implementa
+  `Testavel`", decidido em tempo de execução. Cada função de teste tem um
+  tipo diferente, então uma lista delas só pode ser de `&dyn Testavel`. É o
+  equivalente a uma `List<Testavel>` de interface em Java: a chamada
+  `t.rodar()` passa por uma tabela de métodos (*vtable*).
+- Contraste com `impl FnOnce` ([§30](#30-receber-uma-closure-impl-fnonce)):
+  `impl` gera uma cópia da função para cada tipo, decidida na compilação;
+  `dyn` usa uma única função e decide na execução.
+
+`core::any::type_name::<T>()` devolve o nome do tipo `T` como texto. Para
+uma função, o tipo é o caminho completo dela, e é assim que cada teste
+imprime o próprio nome.

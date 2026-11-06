@@ -64,9 +64,9 @@ each step provides tools for the next:
 5. **React to the hardware**: timer and keyboard.
 6. **Run other programs** in an isolated, safe way.
 
-SiliconOS has finished steps 1 to 5: memory (docs 05 to 07) and hardware
-interrupts, with the timer and the keyboard (doc 08). Next come an
-interactive shell and, later, step 6.
+SiliconOS has finished steps 1 to 5: memory (docs 05 to 07), hardware
+interrupts, with the timer and the keyboard (doc 08), and an interactive
+shell with automated tests (doc 09). Next comes step 6.
 
 ---
 
