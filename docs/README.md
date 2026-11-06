@@ -48,7 +48,7 @@ do livro e depois o documento correspondente.
 | [04: IDT e exceções](04-idt-e-excecoes.md) | Como tratar erros detectados pela CPU (page fault, double fault...) | 5 | ✅ |
 | [05: Memória física](05-memoria-fisica.md) | Mapa de memória, buracos, alocador de quadros (bitmap) | 6 | ✅ |
 | [06: Paginação](06-paginacao.md) | Endereços virtuais, tabelas de 4 níveis, TLB, as tabelas do kernel | 7 | ✅ |
-| 07: Heap | `Box`, `Vec`, `String` dentro do kernel | 8 | ⏳ |
+| [07: Heap](07-heap.md) | `Box`, `Vec`, `String` dentro do kernel: alocadores bump e lista de blocos livres | 8 | ✅ |
 | 08: Interrupções de hardware | Controlador de interrupções, timer, teclado | 9 | ⏳ |
 | 09: Shell e testes | Shell interativo, testes no QEMU, depuração com GDB | 10 | ⏳ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
@@ -98,6 +98,11 @@ que o kernel o trata):
 | `./run.sh teste-paginacao` | mapeia, traduz, lê/escreve por 2 caminhos, desmapeia | 06 |
 | `./run.sh teste-desmapeado` | acessa uma página depois de desmapeá-la (deve dar page fault) | 06 |
 | `./run.sh teste-nulo` | lê o endereço 0 (deve dar page fault) | 06 |
+| `./run.sh teste-heap` | `Box`, `Vec` crescendo, `String`, 15 mil alocações, alinhamento, vazamento zero | 07 |
+| `./run.sh teste-heap-liberacao-dupla` | libera o mesmo bloco do heap duas vezes (deve dar panic) | 07 |
+| `./run.sh teste-heap-esgotar` | aloca 1 MiB por vez até o limite de 64 MiB (deve dar panic) | 07 |
+| `./run.sh teste-heap-executar` | executa código gravado no heap (deve dar page fault: NX) | 07 |
+| `./run.sh teste-bump` | troca o alocador pelo bump: a memória liberada nunca volta | 07 |
 
 Para mudar a memória da máquina emulada (padrão: 128 MiB), use `RAM`, por
 exemplo `RAM=4G ./run.sh teste-quadros`.
@@ -124,7 +129,9 @@ siliconos/
         ├── mod.rs      constantes (tamanho do quadro, 1 MiB)
         ├── mapa.rs     cópia própria do mapa de memória do UEFI
         ├── quadros.rs  alocador de quadros físicos (bitmap)
-        └── paginacao.rs  tabelas de página do kernel                    [doc 06]
+        ├── paginacao.rs  tabelas de página do kernel                    [doc 06]
+        ├── heap.rs     o heap: lista de blocos livres + #[global_allocator] [doc 07]
+        └── bump.rs     alocador bump, só para comparação               [doc 07]
 ```
 
 O fluxo de execução atual, de ponta a ponta:
@@ -146,6 +153,9 @@ O fluxo de execução atual, de ponta a ponta:
                ├─ (testes de memória, se compilado com alguma feature de teste)
                ├─ memoria::paginacao::init() monta as tabelas do kernel e troca o CR3
                ├─ (testes de paginação, se compilado com alguma feature de teste)
+               ├─ memoria::heap::init()  mapeia 1 MiB e liga o alocador global
+               ├─ demonstrar_heap()      Box, Vec e String no boot normal
+               ├─ (testes do heap, se compilado com alguma feature de teste)
                └─ loop { hlt }           dorme para sempre
 ```
 

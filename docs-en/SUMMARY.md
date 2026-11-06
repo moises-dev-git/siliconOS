@@ -11,6 +11,7 @@
 - [04: IDT and exceptions](04-idt-e-excecoes.md)
 - [05: Physical memory](05-memoria-fisica.md)
 - [06: Paging](06-paginacao.md)
+- [07: Heap](07-heap.md)
 
 # Reference
 

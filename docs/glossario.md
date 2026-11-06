@@ -172,6 +172,36 @@ RAM, depois vídeo e ROMs). Tem usos especiais, como ligar as outras CPUs.
 : Dispositivo que aparece como se fosse memória: escrever num certo
 endereço envia dados ao dispositivo. O framebuffer de vídeo é um exemplo.
 
+**Heap**
+: Região de memória de onde saem as alocações de tamanho variável (`Box`,
+`Vec`, `String`), entregues e devolvidas em qualquer ordem. Não tem relação
+com a estrutura de dados "heap" (fila de prioridade). (Doc 07.)
+
+**Alocador global**
+: A parte do kernel que atende todos os pedidos de memória do Rust. No
+SiliconOS, a lista de blocos livres do doc 07.
+
+**Bump allocator**
+: Alocador que só empurra um ponteiro para a frente e nunca reaproveita a
+memória liberada.
+
+**Lista de blocos livres** (*free list*)
+: Lista encadeada dos buracos do heap, com os nós guardados dentro dos
+próprios buracos.
+
+**First fit**
+: Estratégia de alocação que usa o primeiro bloco livre em que o pedido
+cabe.
+
+**Fragmentação**
+: Memória livre picada em buracos pequenos demais para atender um pedido,
+mesmo que a soma deles seja grande. Juntar blocos vizinhos ao liberar
+(*coalescing*) combate a fragmentação.
+
+**Vazamento de memória** (*memory leak*)
+: Memória alocada que nunca é devolvida. Num kernel, que roda por dias,
+vazamentos acabam esgotando a RAM.
+
 **Porta de E/S** (*I/O port*)
 : Forma mais antiga de falar com dispositivos: um espaço separado de
 65 536 "endereços" acessados pelas instruções `in` e `out`. A serial e o

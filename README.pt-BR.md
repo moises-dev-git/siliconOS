@@ -24,7 +24,8 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | IDT e exceções da CPU | `src/idt.rs` | [04](docs/04-idt-e-excecoes.md) |
 | Mapa de memória e alocador de quadros | `src/memoria/` | [05](docs/05-memoria-fisica.md) |
 | Paginação | `src/memoria/paginacao.rs` | [06](docs/06-paginacao.md) |
-| Heap | — | em andamento |
+| Heap: lista de blocos livres, cresce sob demanda, páginas NX | `src/memoria/heap.rs` | [07](docs/07-heap.md) |
+| Interrupções de hardware (timer, teclado) | — | em andamento |
 
 ## Rodar
 

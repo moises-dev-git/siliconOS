@@ -29,3 +29,10 @@ listar-regioes = []
 teste-paginacao = []
 teste-desmapeado = []
 teste-nulo = []
+# Testes do heap (docs/07-heap.md)
+teste-heap = []
+teste-heap-liberacao-dupla = []
+teste-heap-esgotar = []
+teste-heap-executar = []
+# Troca o alocador global pelo bump, para mostrar o limite dele
+teste-bump = []

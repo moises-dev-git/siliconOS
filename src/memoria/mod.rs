@@ -6,6 +6,8 @@
 //!   o UEFI entregou no `exit_boot_services`.
 //! - `quadros`: alocador de quadros físicos de 4 KiB, baseado em bitmap.
 //! - `paginacao`: tabelas de página do kernel (tradução virtual -> físico).
+//! - `heap`: o heap do kernel (Box, Vec, String), docs/07-heap.md.
+//! - `bump`: alocador bump, só para comparação (feature teste-bump).
 
 // `allow(dead_code)`: algumas funções (alocar, liberar...) só são chamadas
 // pelos testes e pelos próximos capítulos (paginação, heap). Sem isso, o
@@ -16,6 +18,10 @@ pub mod mapa;
 pub mod paginacao;
 #[allow(dead_code)]
 pub mod quadros;
+#[allow(dead_code)]
+pub mod heap;
+#[allow(dead_code)]
+pub mod bump;
 
 /// Tamanho de um quadro (e de uma página): 4 KiB.
 pub const TAMANHO_QUADRO: u64 = 4096;

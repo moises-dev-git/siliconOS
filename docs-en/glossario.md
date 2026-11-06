@@ -173,6 +173,36 @@ the other CPUs.
 : A device that appears as if it were memory: writing to a certain address
 sends data to the device. The video framebuffer is an example.
 
+**Heap**
+: The memory region from which variable-size allocations (`Box`, `Vec`,
+`String`) come, handed out and returned in any order. It has nothing to do
+with the "heap" data structure (priority queue). (Doc 07.)
+
+**Global allocator**
+: The part of the kernel that serves all of Rust's memory requests. In
+SiliconOS, the free list from doc 07.
+
+**Bump allocator**
+: An allocator that only bumps a pointer forward and never reuses freed
+memory.
+
+**Free list**
+: A linked list of the heap's holes, with the nodes stored inside the holes
+themselves.
+
+**First fit**
+: An allocation strategy that uses the first free block the request fits
+in.
+
+**Fragmentation**
+: Free memory chopped into holes too small to serve a request, even if
+their sum is large. Merging neighboring blocks on free (*coalescing*)
+fights fragmentation.
+
+**Memory leak**
+: Memory that is allocated and never given back. In a kernel, which runs
+for days, leaks end up exhausting RAM.
+
 **I/O port**
 : The older way of talking to devices: a separate space of 65,536
 "addresses" accessed by the `in` and `out` instructions. The serial port and

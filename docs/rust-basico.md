@@ -392,9 +392,9 @@ parâmetros: `|x, y| x + y`.
 | `alloc` | `Box`, `Vec`, `String` (precisa de alguém que forneça memória) | não, mas exige um alocador |
 | `std` | arquivos, rede, threads, `println!`... | **sim** |
 
-O SiliconOS usa só `core` (`#![no_std]`). Quando escrevermos um alocador de
-memória (capítulo 8 do livro), ganharemos também `alloc` e poderemos usar
-`Vec` e `String` dentro do kernel.
+O SiliconOS é `#![no_std]`: usa `core` e, desde o heap do doc 07, também
+`alloc` ([§26](#26-alloc-box-vec-e-string)), com `Vec` e `String` dentro do
+kernel. A `std` continua fora.
 
 ---
 
@@ -571,3 +571,91 @@ O parâmetro `Ordering` controla as garantias de ordem entre CPUs
 diferentes. `Relaxed` (a mais fraca) basta quando só importa o valor da
 própria variável; `SeqCst` (a mais forte, usada no panic handler) garante uma
 ordem global. Enquanto o SiliconOS rodar numa CPU só, a diferença não aparece.
+
+---
+
+## 26. `alloc`: `Box`, `Vec` e `String`
+
+Com um alocador global (doc 07), a crate `alloc` passa a funcionar. Ela é
+trazida com uma linha no topo do `main.rs`:
+
+```rust
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+use alloc::format;
+```
+
+| Rust | O que é | Equivalente aproximado |
+|---|---|---|
+| `Box<T>` | um único valor `T` guardado no heap; o `Box` é o dono | um objeto Java (sempre no heap), mas com dono único |
+| `Vec<T>` | lista que cresce, com os elementos contíguos no heap | `ArrayList<T>`, `list` do Python, array do JS |
+| `String` | texto UTF-8 que cresce, no heap | `StringBuilder` do Java |
+| `format!(...)` | como `kprintln!`, mas devolve uma `String` | `String.format(...)`, f-strings |
+
+```rust
+let b = Box::new(42u64);                      // aloca 8 bytes e guarda 42
+let mut v: Vec<u64> = Vec::new();
+v.push(1);                                    // pode realocar se encher
+let q: Vec<u64> = (1..=8).map(|x| x * x).collect();   // monta um Vec a partir de um iterador
+let mut s = String::from("Silicon");
+s.push_str("OS");
+let t = format!("{} = {}", "x", 10);
+```
+
+A grande diferença para Java: **não há coletor de lixo**. Quando um `Box`,
+`Vec` ou `String` sai de escopo, o `drop` (seção 8) chama o alocador e
+devolve a memória **naquele momento**. `drop(v)` faz isso antes do fim do
+escopo.
+
+Um `Vec` guarda três números: ponteiro para os elementos, quantidade
+(`len`) e capacidade. Quando `len` chega à capacidade, o próximo `push`
+pede um bloco maior (normalmente o dobro), copia tudo e libera o antigo.
+`Vec::with_capacity(n)` reserva espaço de uma vez e evita essas cópias.
+
+`vec![valor; n]` cria um `Vec` com `n` cópias de `valor` direto no heap.
+Útil para buffers grandes: `Box::new([0u8; 1 << 20])` montaria o array de
+1 MiB **na pilha** antes de copiá-lo, e poderia estourá-la.
+
+---
+
+## 27. `GlobalAlloc`, `Layout` e `#[global_allocator]`
+
+A crate `alloc` não sabe de onde vem a memória. Ela chama o `static`
+marcado com `#[global_allocator]`, que precisa implementar a trait
+`GlobalAlloc`:
+
+```rust
+unsafe impl GlobalAlloc for AlocadorLista {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { ... }      // nulo = sem memória
+    unsafe fn dealloc(&self, ponteiro: *mut u8, layout: Layout) { ... }
+}
+
+#[global_allocator]
+static ALOCADOR: AlocadorLista = AlocadorLista;
+```
+
+- **`Layout`** descreve um pedido: `layout.size()` (bytes) e
+  `layout.align()` (o endereço precisa ser múltiplo disto; sempre uma
+  potência de 2). `Layout::new::<u64>()` é 8 e 8;
+  `Layout::from_size_align(100, 4096)` cria um à mão.
+- `dealloc` recebe o **mesmo** `Layout` usado no `alloc`, então o alocador
+  não precisa anotar o tamanho de cada bloco.
+- **`unsafe impl`**: implementar uma trait `unsafe` é uma promessa que o
+  compilador não verifica. Aqui: "os blocos são válidos, alinhados e não se
+  sobrepõem". `unsafe impl Send for X {}` (doc 01) é o mesmo tipo de
+  promessa.
+- Devolver um ponteiro nulo em `alloc` significa "sem memória". O Rust
+  então chama o *alloc error handler*, que em `no_std` dispara um panic
+  "memory allocation of N bytes failed".
+- Também dá para chamar o alocador diretamente:
+  `alloc::alloc::alloc(layout)` e `alloc::alloc::dealloc(p, layout)`
+  (sempre `unsafe`). O doc 07 usa isso nos testes de alinhamento e de
+  liberação dupla.
+
+`core::mem::transmute::<A, B>(x)` reinterpreta os bits de `x` como outro
+tipo, sem conversão nenhuma. O doc 07 o usa para transformar um endereço
+do heap num ponteiro de função, no teste do NX. É uma das operações mais
+perigosas do Rust: use só quando não houver outra saída.

@@ -11,6 +11,7 @@
 - [04: IDT e exceções](04-idt-e-excecoes.md)
 - [05: Memória física](05-memoria-fisica.md)
 - [06: Paginação](06-paginacao.md)
+- [07: Heap](07-heap.md)
 
 # Referência
 

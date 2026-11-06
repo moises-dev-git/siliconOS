@@ -51,7 +51,7 @@ existem:
 | Você está acostumado a... | No kernel... |
 |---|---|
 | `System.out.println` / `print()` | Não há terminal. Temos que desenhar cada letra na tela, pixel a pixel (doc 01). |
-| `new` / alocar listas | Não há quem forneça memória. Teremos que escrever o alocador (capítulos futuros). |
+| `new` / alocar listas | Não há quem forneça memória. Escrevemos o nosso próprio alocador (docs 05 e 07). |
 | Exceções com *stack trace* | Um erro trava ou reinicia a máquina sem mensagem nenhuma, até escrevermos os tratadores (docs 02 e 04). |
 | Depurador da IDE | Só depois de muito trabalho. No começo, depuramos imprimindo texto. |
 | Threads | Não existem até nós as criarmos. |
@@ -66,9 +66,9 @@ cada etapa dá ferramentas para a próxima:
 5. **Reagir ao hardware**: timer e teclado.
 6. **Rodar outros programas** de forma isolada e segura.
 
-O SiliconOS já concluiu as etapas 1 a 3 e está no meio da etapa 4: a
-memória física e a paginação estão prontas (docs 05 e 06), e o heap vem a
-seguir.
+O SiliconOS já concluiu as etapas 1 a 4: a memória física, a paginação e o
+heap estão prontos (docs 05 a 07). A próxima é a etapa 5, reagir ao
+hardware.
 
 ---
 
@@ -267,7 +267,7 @@ O que a `std` fazia e agora é responsabilidade nossa:
 |---|---|
 | `println!` | `kprintln!`, que escreve na serial e na tela (doc 01) |
 | o que fazer quando o programa entra em pânico | `#[panic_handler]` (doc 02) |
-| alocador de memória (`Vec`, `String`, `Box`) | ainda não existe (capítulo futuro) |
+| alocador de memória (`Vec`, `String`, `Box`) | o heap do kernel (doc 07) |
 | ponto de entrada `main` | `#[entry]` da crate `uefi` |
 
 ### 4.2 `#![no_main]`

@@ -57,7 +57,7 @@ book and then the matching document.
 | [04: IDT and exceptions](04-idt-e-excecoes.md) | Handling errors detected by the CPU (page fault, double fault...) | 5 | ✅ |
 | [05: Physical memory](05-memoria-fisica.md) | Memory map, holes, frame allocator (bitmap) | 6 | ✅ |
 | [06: Paging](06-paginacao.md) | Virtual addresses, 4-level tables, TLB, the kernel's tables | 7 | ✅ |
-| 07: Heap | `Box`, `Vec`, `String` inside the kernel | 8 | ⏳ |
+| [07: Heap](07-heap.md) | `Box`, `Vec`, `String` inside the kernel: bump and free-list allocators | 8 | ✅ |
 | 08: Hardware interrupts | Interrupt controller, timer, keyboard | 9 | ⏳ |
 | 09: Shell and tests | Interactive shell, tests in QEMU, debugging with GDB | 10 | ⏳ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
@@ -109,6 +109,11 @@ kernel handles it):
 | `./run.sh teste-paginacao` | maps, translates, reads/writes through 2 paths, unmaps | 06 |
 | `./run.sh teste-desmapeado` | accesses a page after unmapping it (must page fault) | 06 |
 | `./run.sh teste-nulo` | reads address 0 (must page fault) | 06 |
+| `./run.sh teste-heap` | `Box`, growing `Vec`, `String`, 15 thousand allocations, alignment, zero leaks | 07 |
+| `./run.sh teste-heap-liberacao-dupla` | frees the same heap block twice (must panic) | 07 |
+| `./run.sh teste-heap-esgotar` | allocates 1 MiB at a time up to the 64 MiB limit (must panic) | 07 |
+| `./run.sh teste-heap-executar` | executes code written to the heap (must page fault: NX) | 07 |
+| `./run.sh teste-bump` | swaps the allocator for bump: freed memory never comes back | 07 |
 
 To change the emulated machine's memory (default: 128 MiB), use `RAM`, for
 example `RAM=4G ./run.sh teste-quadros`.
@@ -135,7 +140,9 @@ siliconos/
         ├── mod.rs      constants (frame size, 1 MiB)
         ├── mapa.rs     our own copy of the UEFI memory map
         ├── quadros.rs  physical frame allocator (bitmap)
-        └── paginacao.rs  the kernel's page tables                       [doc 06]
+        ├── paginacao.rs  the kernel's page tables                       [doc 06]
+        ├── heap.rs     the heap: free list + #[global_allocator]        [doc 07]
+        └── bump.rs     bump allocator, for comparison only             [doc 07]
 ```
 
 The current execution flow, end to end:
@@ -157,6 +164,9 @@ The current execution flow, end to end:
                ├─ (memory tests, if built with a test feature)
                ├─ memoria::paginacao::init() builds the kernel's tables and switches CR3
                ├─ (paging tests, if built with a test feature)
+               ├─ memoria::heap::init()  maps 1 MiB and turns on the global allocator
+               ├─ demonstrar_heap()      Box, Vec and String in the normal boot
+               ├─ (heap tests, if built with a test feature)
                └─ loop { hlt }           sleeps forever
 ```
 

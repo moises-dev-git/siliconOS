@@ -49,7 +49,7 @@ Things you have always used without thinking simply do not exist:
 | You are used to... | In the kernel... |
 |---|---|
 | `System.out.println` / `print()` | There is no terminal. We have to draw every letter on the screen, pixel by pixel (doc 01). |
-| `new` / allocating lists | Nobody provides memory. We will have to write the allocator (future chapters). |
+| `new` / allocating lists | Nobody provides memory. We wrote our own allocator (docs 05 and 07). |
 | Exceptions with a *stack trace* | An error freezes or reboots the machine with no message at all, until we write the handlers (docs 02 and 04). |
 | The IDE's debugger | Only after a lot of work. At first, we debug by printing text. |
 | Threads | They do not exist until we create them. |
@@ -64,9 +64,8 @@ each step provides tools for the next:
 5. **React to the hardware**: timer and keyboard.
 6. **Run other programs** in an isolated, safe way.
 
-SiliconOS has finished steps 1 to 3 and is in the middle of step 4:
-physical memory and paging are done (docs 05 and 06), and the heap comes
-next.
+SiliconOS has finished steps 1 to 4: physical memory, paging and the heap
+are done (docs 05 to 07). Next comes step 5, reacting to the hardware.
 
 ---
 
@@ -265,7 +264,7 @@ What `std` did and is now our responsibility:
 |---|---|
 | `println!` | `kprintln!`, which writes to the serial port and the screen (doc 01) |
 | what to do when the program panics | `#[panic_handler]` (doc 02) |
-| memory allocator (`Vec`, `String`, `Box`) | does not exist yet (future chapter) |
+| memory allocator (`Vec`, `String`, `Box`) | the kernel's heap (doc 07) |
 | `main` entry point | `#[entry]` from the `uefi` crate |
 
 ### 4.2 `#![no_main]`

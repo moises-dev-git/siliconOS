@@ -2,6 +2,10 @@
 #![no_main]
 #![feature(abi_x86_interrupt)] // permite extern "x86-interrupt" (idt.rs)
 
+// A crate `alloc` (Box, Vec, String) passa a existir porque o kernel agora
+// tem um alocador global (src/memoria/heap.rs, docs/07-heap.md).
+extern crate alloc;
+
 mod console;
 mod gdt;
 mod idt;
@@ -125,6 +129,11 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
                       memoria::paginacao::DESLOCAMENTO_FISICO + memoria::INICIO_UTILIZAVEL);
     testes_de_paginacao();
 
+    // ---- Heap (docs/07-heap.md) ----
+    memoria::heap::init();
+    demonstrar_heap();
+    testes_de_heap();
+
     // Compile com `--features teste-panic` para ver o panic handler agindo.
     #[cfg(feature = "teste-panic")]
     {
@@ -135,7 +144,7 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     }
 
     kprintln!();
-    kprintln!("Proxima etapa: heap (capitulo 8).");
+    kprintln!("Proxima etapa: interrupcoes de hardware (capitulo 9).");
 
     loop {
         unsafe { core::arch::asm!("hlt") };
@@ -390,5 +399,180 @@ fn testes_de_paginacao() {
         // Em assembly de propósito: em Rust, ler um ponteiro nulo é
         // comportamento indefinido e o compilador pode fazer qualquer coisa.
         unsafe { core::arch::asm!("mov rax, [0]", out("rax") _) };
+    }
+}
+
+/// Usa o heap no boot normal: a prova de que Box, Vec e String funcionam.
+fn demonstrar_heap() {
+    use alloc::boxed::Box;
+    use alloc::string::String;
+    use alloc::vec::Vec;
+    use memoria::heap::HEAP_INICIO;
+
+    let caixa = Box::new(42u64);
+    let quadrados: Vec<u64> = (1..=8).map(|x| x * x).collect();
+    let mut texto = String::from("SiliconOS");
+    texto.push_str(" tem heap");
+
+    kprintln!("Heap: faixa virtual a partir de {:#x}", HEAP_INICIO);
+    kprintln!("  Box::new(42)      -> {} em {:p}", caixa, &*caixa);
+    kprintln!("  Vec (quadrados)   -> {:?}", quadrados);
+    kprintln!("  String            -> \"{}\" ({} bytes)", texto, texto.len());
+
+    #[cfg(not(feature = "teste-bump"))]
+    {
+        let e = memoria::heap::estatisticas();
+        kprintln!("  em uso: {} bytes em {} alocacoes; mapeado: {} KiB; blocos livres: {}",
+                  e.em_uso, e.alocacoes - e.liberacoes, e.mapeado / 1024, e.blocos_livres);
+    }
+}
+
+/// Testes do heap:
+///   ./run.sh teste-heap                  Box, Vec crescendo, String, milhares de
+///                                        alocações, alinhamento e vazamento zero
+///   ./run.sh teste-heap-liberacao-dupla  libera o mesmo bloco duas vezes -> panic
+///   ./run.sh teste-heap-esgotar          aloca 1 MiB por vez até o limite -> panic
+///   ./run.sh teste-heap-executar         executa código gravado no heap -> #PF (NX)
+///   ./run.sh teste-bump                  usa o alocador bump: a memória nunca volta
+fn testes_de_heap() {
+    #[cfg(feature = "teste-heap")]
+    {
+        use alloc::boxed::Box;
+        use alloc::format;
+        use alloc::string::String;
+        use alloc::vec::Vec;
+        use core::alloc::Layout;
+        use memoria::heap::{self, HEAP_INICIO, TAMANHO_INICIAL};
+
+        let antes = heap::estatisticas();
+        let quadros_antes = memoria::quadros::livres();
+
+        // 1. Box: o valor mora no heap.
+        let b = Box::new(0xDEAD_BEEFu64);
+        let endereco = &*b as *const u64 as u64;
+        assert_eq!(*b, 0xDEAD_BEEF);
+        assert!(heap::contem(endereco), "Box fora do heap: {:#x}", endereco);
+        drop(b);
+
+        // 2. Vec crescendo além do heap inicial (200 000 u64 = 1,6 MB > 1 MiB).
+        let mut v: Vec<u64> = Vec::new();
+        for i in 0..200_000u64 {
+            v.push(i);
+        }
+        let soma: u64 = v.iter().sum();
+        assert_eq!(soma, 199_999 * 200_000 / 2);
+        let durante = heap::estatisticas();
+        assert!(durante.mapeado > TAMANHO_INICIAL, "o heap deveria ter crescido");
+        kprintln!("Teste heap: Vec de {} u64 ok; heap cresceu de {} KiB para {} KiB",
+                  v.len(), TAMANHO_INICIAL / 1024, durante.mapeado / 1024);
+        drop(v);
+
+        // 3. String e format!.
+        let mut s = String::new();
+        for i in 0..100 {
+            s.push_str(&format!("{},", i));
+        }
+        assert!(s.starts_with("0,1,2,") && s.ends_with("98,99,"));
+        assert_eq!(s.len(), 290);
+        drop(s);
+
+        // 4. Muitas alocações pequenas, liberando metade e realocando.
+        let mut caixas: Vec<Box<[u64; 4]>> = (0..10_000u64).map(|i| Box::new([i; 4])).collect();
+        let mut i = 0u64;
+        caixas.retain(|_| { i += 1; i % 2 == 0 });           // libera as ímpares
+        let com_buracos = heap::estatisticas();
+        for j in 0..5_000u64 {
+            caixas.push(Box::new([1_000_000 + j; 4]));        // reaproveita os buracos
+        }
+        assert_eq!(caixas.len(), 10_000);
+        assert!(caixas[..5_000].iter().enumerate().all(|(k, c)| c[0] == 2 * k as u64 + 1 && c[3] == c[0]));
+        assert!(caixas[5_000..].iter().enumerate().all(|(k, c)| c[0] == 1_000_000 + k as u64));
+        let com_caixas = heap::estatisticas();
+        drop(caixas);
+
+        // 5. Alinhamentos grandes, pedidos direto ao alocador.
+        for &alinhamento in &[64usize, 4096] {
+            let layout = Layout::from_size_align(100, alinhamento).unwrap();
+            let p = unsafe { alloc::alloc::alloc(layout) };
+            assert!(!p.is_null() && p as usize % alinhamento == 0,
+                    "alinhamento {} falhou: {:p}", alinhamento, p);
+            unsafe { alloc::alloc::dealloc(p, layout) };
+        }
+
+        // 6. Tudo devolvido: nada vazou e os buracos se juntaram de novo.
+        let depois = heap::estatisticas();
+        assert_eq!(depois.em_uso, antes.em_uso, "vazamento no heap");
+        assert_eq!(depois.blocos_livres, 1, "os blocos livres deveriam ter se juntado");
+        assert_eq!(depois.maior_livre as u64, depois.mapeado - depois.em_uso as u64);
+        kprintln!("Teste heap OK: Box, Vec, String, {} alocacoes e {} liberacoes,",
+                  depois.alocacoes - antes.alocacoes, depois.liberacoes - antes.liberacoes);
+        kprintln!("  pico {} KiB; blocos livres: {} com metade das caixas liberada, {} depois de",
+                  depois.pico / 1024, com_buracos.blocos_livres, com_caixas.blocos_livres);
+        kprintln!("  realocar 5 000 caixas nos buracos; alinhamento 64 e 4096 ok;");
+        kprintln!("  em uso no fim = no inicio ({} bytes), 1 bloco livre de {} KiB;",
+                  depois.em_uso, depois.maior_livre / 1024);
+        kprintln!("  quadros usados pelo crescimento: {} (o heap nao devolve quadros)",
+                  quadros_antes - memoria::quadros::livres());
+        let _ = HEAP_INICIO;
+    }
+
+    #[cfg(feature = "teste-heap-liberacao-dupla")]
+    {
+        use core::alloc::Layout;
+        let layout = Layout::new::<u64>();
+        let p = unsafe { alloc::alloc::alloc(layout) };
+        kprintln!("Teste: liberando o bloco {:p} do heap duas vezes...", p);
+        unsafe {
+            alloc::alloc::dealloc(p, layout);
+            alloc::alloc::dealloc(p, layout); // <- deve dar panic
+        }
+    }
+
+    #[cfg(feature = "teste-heap-esgotar")]
+    {
+        use alloc::vec;
+        use alloc::vec::Vec;
+        use memoria::heap::TAMANHO_MAXIMO;
+        kprintln!("Teste: alocando 1 MiB por vez ate o limite do heap ({} MiB)...",
+                  TAMANHO_MAXIMO / (1024 * 1024));
+        let mut blocos: Vec<Vec<u8>> = Vec::new();
+        loop {
+            blocos.push(vec![0xAB; 1024 * 1024]);
+            if blocos.len() % 16 == 0 || blocos.len() >= 60 {
+                let e = memoria::heap::estatisticas();
+                kprintln!("  {} MiB alocados (heap mapeado: {} KiB)", blocos.len(), e.mapeado / 1024);
+            }
+        }
+    }
+
+    #[cfg(feature = "teste-heap-executar")]
+    {
+        use alloc::boxed::Box;
+        // 0xC3 é a instrução `ret`. Se a página permitisse execução, a chamada
+        // abaixo simplesmente voltaria. Com NX, a CPU recusa buscar a instrução.
+        let codigo = Box::new([0xC3u8; 16]);
+        let endereco = codigo.as_ptr() as u64;
+        kprintln!("Teste: executando um `ret` gravado no heap em {:#x}...", endereco);
+        let funcao: extern "C" fn() = unsafe { core::mem::transmute(endereco) };
+        funcao();
+        kprintln!("ERRO: o heap deveria ser proibido de executar (NX)");
+    }
+
+    #[cfg(feature = "teste-bump")]
+    {
+        use alloc::boxed::Box;
+        use memoria::bump;
+        kprintln!("Teste bump: cria e destroi uma caixa de 1 KiB por vez.");
+        kprintln!("  So uma caixa existe a cada momento, mas a memoria nunca volta:");
+        for i in 1..=2_000u32 {
+            let caixa = Box::new([i as u8; 1024]);
+            core::hint::black_box(&caixa);
+            drop(caixa);
+            if i % 250 == 0 {
+                let (usado, aloc, lib) = bump::estado();
+                kprintln!("  {:>4} caixas: {:>4} KiB consumidos ({} alocacoes, {} liberacoes ignoradas)",
+                          i, usado / 1024, aloc, lib);
+            }
+        }
     }
 }

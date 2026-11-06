@@ -28,7 +28,8 @@ OS or programmed in Rust. Each chapter's comments live in the
 | IDT and CPU exceptions | `src/idt.rs` | [04](docs-en/04-idt-e-excecoes.md) |
 | Memory map and frame allocator | `src/memoria/` | [05](docs-en/05-memoria-fisica.md) |
 | Paging | `src/memoria/paginacao.rs` | [06](docs-en/06-paginacao.md) |
-| Heap | — | in progress |
+| Heap: free list, grows on demand, NX pages | `src/memoria/heap.rs` | [07](docs-en/07-heap.md) |
+| Hardware interrupts (timer, keyboard) | — | in progress |
 
 ## Running
 
