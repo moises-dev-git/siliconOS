@@ -64,7 +64,9 @@ each step provides tools for the next:
 5. **React to the hardware**: timer and keyboard.
 6. **Run other programs** in an isolated, safe way.
 
-SiliconOS is now at the end of step 3.
+SiliconOS has finished steps 1 to 3 and is in the middle of step 4:
+physical memory and paging are done (docs 05 and 06), and the heap comes
+next.
 
 ---
 

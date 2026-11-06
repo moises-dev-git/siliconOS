@@ -66,7 +66,9 @@ cada etapa dá ferramentas para a próxima:
 5. **Reagir ao hardware**: timer e teclado.
 6. **Rodar outros programas** de forma isolada e segura.
 
-O SiliconOS está agora no fim da etapa 3.
+O SiliconOS já concluiu as etapas 1 a 3 e está no meio da etapa 4: a
+memória física e a paginação estão prontas (docs 05 e 06), e o heap vem a
+seguir.
 
 ---
 
@@ -94,9 +96,9 @@ Existem duas gerações de firmware:
 | Serviços oferecidos | rotinas antigas e limitadas | vídeo, teclado, arquivos, memória, rede... |
 
 Com BIOS, o primeiro trabalho de um sistema operacional é sair dos 16
-bits, passar por 32 bits e chegar a 64 bits. Isso é o que o
-`boot_sect.asm` do seu projeto MetalOS começava a fazer. Com UEFI, a CPU
-já chega em 64 bits.
+bits, passar por 32 bits e chegar a 64 bits. É o que faz o clássico setor
+de boot (o `boot_sect.asm` de muitos tutoriais de SO). Com UEFI, a CPU já
+chega em 64 bits.
 
 O SiliconOS usa **UEFI**.
 
