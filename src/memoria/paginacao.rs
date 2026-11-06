@@ -246,6 +246,10 @@ pub fn mapear_em(raiz: u64, virt: u64, fisico: u64, tamanho: TamanhoPagina, bits
             *e = Entrada(nova | PRESENTE | ESCRITA | (bits & USUARIO));
         } else if e.grande() {
             return Err(ErroMapeamento::JaMapeado);
+        } else if bits & USUARIO != 0 && e.0 & USUARIO == 0 {
+            // A tabela já existia, criada para o kernel. Para o anel 3 chegar
+            // à página, TODOS os níveis precisam do bit USUARIO (doc 10).
+            *e = Entrada(e.0 | USUARIO);
         }
         tabela = e.endereco();
     }

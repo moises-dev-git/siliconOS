@@ -303,7 +303,39 @@ posto num endereço diferente do previsto no arquivo (o *ImageBase*).
 **Chamada de sistema (*syscall*)**
 : Quando um programa pede algo ao kernel (abrir arquivo, alocar memória),
 ele executa uma instrução especial que passa a CPU para o anel 0 de forma
-controlada.
+controlada. No SiliconOS, `int 0x80` (doc 10).
+
+**CPL / DPL / RPL**
+: CPL (*current privilege level*): o anel em que a CPU está agora, nos 2
+bits baixos do CS. DPL (*descriptor privilege level*): o anel exigido por
+um descritor (segmento, entrada da IDT). RPL (*requested privilege level*):
+os 2 bits baixos de um seletor.
+
+**TSS.RSP0**
+: O campo da TSS com a pilha que a CPU usa ao receber uma interrupção no
+anel 3. O programa nunca controla essa pilha.
+
+**`iretq`**
+: A instrução que volta de uma interrupção, desempilhando RIP, CS, RFLAGS,
+RSP e SS. Com um quadro montado à mão, é também como o kernel **entra** no
+anel 3.
+
+**ABI** (*application binary interface*)
+: O contrato no nível do código de máquina: quais registradores carregam
+argumentos e resultados, como fica a pilha. Uma convenção de chamada e a
+lista de chamadas de sistema fazem parte da ABI.
+
+**Código independente de posição**
+: Código de máquina que funciona em qualquer endereço, porque só usa
+endereços relativos à instrução atual (`[rip + ...]`).
+
+**Espaço de endereços**
+: O conjunto de traduções (as tabelas de página) que um programa enxerga.
+Sistemas de verdade dão um a cada processo.
+
+**SMEP / SMAP**
+: Proteções da CPU (bits 20 e 21 do CR4) que impedem o kernel de executar
+(SMEP) ou de acessar (SMAP) páginas de usuário sem querer.
 
 ---
 

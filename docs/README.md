@@ -51,6 +51,7 @@ do livro e depois o documento correspondente.
 | [07: Heap](07-heap.md) | `Box`, `Vec`, `String` dentro do kernel: alocadores bump e lista de blocos livres | 8 | ✅ |
 | [08: Interrupções de hardware](08-interrupcoes-de-hardware.md) | 8259, APIC e ACPI; timer a 100 Hz; teclado PS/2; deadlock | 9 | ✅ |
 | [09: Shell e testes](09-shell-e-testes.md) | Shell interativo, `cargo test` no QEMU, depuração com GDB | 10 | ✅ |
+| [10: Modo usuário](10-modo-usuario.md) | Anel 3, `iretq`, chamadas de sistema (`int 0x80`), programas isolados | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 
@@ -138,6 +139,9 @@ siliconos/
     ├── console.rs  Desenha texto na tela, pixel a pixel                [doc 01]
     ├── panic.rs    O que fazer quando o Rust detecta um erro           [doc 02]
     ├── shell.rs    A linha de comando: edição, tabela de comandos      [doc 09]
+    ├── usuario/                                                         [doc 10]
+    │   ├── mod.rs      entrar/sair do anel 3, chamadas de sistema
+    │   └── programas.rs  os programas de usuário (assembly)
     ├── testes.rs   Framework de testes do `cargo test`                 [doc 09]
     ├── qemu.rs     Sai do QEMU com código (isa-debug-exit)             [doc 09]
     ├── gdt.rs      Tabela de segmentos e pilha de emergência           [doc 03]
@@ -186,6 +190,7 @@ O fluxo de execução atual, de ponta a ponta:
                ├─ (testes de interrupção, se compilado com alguma feature de teste)
                ├─ (cargo test: rodar_testes() roda os #[test_case] e sai do QEMU)
                └─ shell::rodar()         dorme (hlt); cada tecla vai para o shell
+                    └─ rodar <programa>  usuario::rodar(): anel 3 até o programa terminar
 ```
 
 ---

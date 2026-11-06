@@ -19,9 +19,7 @@ use spin::Once;
 // ---------------------------------------------------------------------------
 pub const KERNEL_CODE: u16 = 1 << 3; // 0x08
 pub const KERNEL_DATA: u16 = 2 << 3; // 0x10
-#[allow(dead_code)] // usados quando houver modo usuário
 pub const USER_DATA: u16 = (3 << 3) | 3; // 0x1B (RPL 3)
-#[allow(dead_code)]
 pub const USER_CODE: u16 = (4 << 3) | 3; // 0x23 (RPL 3)
 pub const TSS_SEL: u16 = 5 << 3; // 0x28 (ocupa as entradas 5 e 6)
 
@@ -64,7 +62,8 @@ const DESC_USER_CODE: u64 = P | S | E | RW | L | G | LIMITE_MAX | dpl(3);
 pub struct Tss {
     _reservado0: u32,
     /// Pilhas usadas ao entrar no anel 0/1/2 vindo de um anel menos
-    /// privilegiado (rsp[0] será usado quando houver modo usuário).
+    /// privilegiado. rsp[0]: a pilha do kernel quando uma interrupção ou
+    /// chamada de sistema chega com a CPU no anel 3 (docs/10-modo-usuario.md).
     pub rsp: [u64; 3],
     _reservado1: u64,
     /// Interrupt Stack Table: 7 pilhas de emergência que a IDT pode pedir.
@@ -86,6 +85,10 @@ const TAM_PILHA_IST: usize = 5 * 4096;
 struct Pilha([u8; TAM_PILHA_IST]);
 
 static mut PILHA_DOUBLE_FAULT: Pilha = Pilha([0; TAM_PILHA_IST]);
+
+/// Pilha do anel 0 para interrupções vindas do anel 3 (TSS.rsp[0]).
+/// Programas de usuário nunca a veem: a CPU troca de pilha sozinha.
+static mut PILHA_ANEL0: Pilha = Pilha([0; TAM_PILHA_IST]);
 
 static TSS: Once<Tss> = Once::new();
 static GDT: Once<[u64; 7]> = Once::new();
@@ -117,9 +120,10 @@ pub fn init() {
         let inicio = &raw const PILHA_DOUBLE_FAULT as u64;
         let mut ist = [0u64; 7];
         ist[(IST_DOUBLE_FAULT - 1) as usize] = inicio + TAM_PILHA_IST as u64;
+        let topo_anel0 = &raw const PILHA_ANEL0 as u64 + TAM_PILHA_IST as u64;
         Tss {
             _reservado0: 0,
-            rsp: [0; 3],
+            rsp: [topo_anel0, 0, 0],
             _reservado1: 0,
             ist,
             _reservado2: 0,
@@ -206,6 +210,11 @@ pub fn estado() -> Estado {
         asm!("str {0:x}", out(reg) tr, options(nomem, nostack, preserves_flags));
     }
     Estado { base: p.base, limite: p.limite, cs, ss, ds, tr }
+}
+
+/// Topo da pilha usada ao vir do anel 3 (TSS.rsp[0]).
+pub fn topo_pilha_anel0() -> u64 {
+    TSS.get().map(|t| { let rsp = t.rsp; rsp[0] }).unwrap_or(0)
 }
 
 /// Endereço do topo da pilha IST de double fault (para exibir no boot).

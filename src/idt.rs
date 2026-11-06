@@ -18,6 +18,7 @@ use spin::Once;
 
 use crate::gdt;
 use crate::kprintln;
+use crate::usuario;
 
 // ---------------------------------------------------------------------------
 // Formato de uma entrada da IDT (16 bytes em modo 64 bits)
@@ -39,6 +40,9 @@ const _: () = assert!(size_of::<Entrada>() == 16);
 /// P=1, DPL=0, tipo 0xE = "interrupt gate" de 64 bits
 /// (desliga as interrupções automaticamente ao entrar no tratador).
 const INTERRUPT_GATE: u8 = 0x8E;
+/// O mesmo com DPL=3 (bits 5-6): o anel 3 pode usar `int` com este vetor.
+/// Com DPL=0, um `int 0x80` vindo do anel 3 vira #GP (docs/10-modo-usuario.md).
+const INTERRUPT_GATE_DPL3: u8 = 0xEE;
 
 impl Entrada {
     const VAZIA: Entrada = Entrada {
@@ -56,6 +60,12 @@ impl Entrada {
             endereco_32_63: (tratador >> 32) as u32,
             _reservado: 0,
         }
+    }
+
+    /// A mesma entrada, mas chamável pelo anel 3 (chamadas de sistema).
+    fn para_usuario(mut self) -> Entrada {
+        self.tipo_atributos = INTERRUPT_GATE_DPL3;
+        self
     }
 }
 
@@ -106,6 +116,11 @@ pub fn init() {
         for v in [int::VETOR_PIC_ESPURIO_1, int::VETOR_PIC_ESPURIO_2, int::VETOR_APIC_ESPURIO] {
             t[v as usize] = Entrada::new(int::espuria as *const () as u64, 0);
         }
+
+        // Chamadas de sistema (docs/10-modo-usuario.md).
+        use crate::usuario;
+        t[usuario::VETOR_SYSCALL as usize] =
+            Entrada::new(usuario::entrada_syscall as *const () as u64, 0).para_usuario();
         t
     });
 
@@ -137,11 +152,13 @@ extern "x86-interrupt" fn breakpoint(quadro: QuadroInterrupcao) {
 
 /// #DE — divisão (inteira) por zero, ou resultado grande demais para o registrador.
 extern "x86-interrupt" fn divisao(quadro: QuadroInterrupcao) {
+    usuario::falha_do_programa(&quadro, "DIVISAO POR ZERO", format_args!("#DE"));
     panic!("EXCECAO #0 DIVISAO POR ZERO\n{}", quadro);
 }
 
 /// #UD — a CPU encontrou bytes que não formam uma instrução válida.
 extern "x86-interrupt" fn opcode_invalido(quadro: QuadroInterrupcao) {
+    usuario::falha_do_programa(&quadro, "OPCODE INVALIDO", format_args!("#UD"));
     panic!("EXCECAO #6 OPCODE INVALIDO\n{}", quadro);
 }
 
@@ -150,6 +167,8 @@ extern "x86-interrupt" fn opcode_invalido(quadro: QuadroInterrupcao) {
 /// vetor da IDT sem tratador...). O código de erro, quando não é zero,
 /// indica o seletor ou vetor envolvido.
 extern "x86-interrupt" fn protecao_geral(quadro: QuadroInterrupcao, codigo: u64) {
+    // No anel 3, a causa mais comum: uma instrução privilegiada (cli, hlt, in, out...).
+    usuario::falha_do_programa(&quadro, "PROTECAO GERAL", format_args!("#GP, codigo={:#x}", codigo));
     if codigo == 0 {
         // Nenhum seletor envolvido: endereço não-canônico, instrução
         // privilegiada, bit reservado num registrador de controle...
@@ -169,13 +188,13 @@ extern "x86-interrupt" fn protecao_geral(quadro: QuadroInterrupcao, codigo: u64)
 extern "x86-interrupt" fn page_fault(quadro: QuadroInterrupcao, codigo: u64) {
     let cr2: u64;
     unsafe { asm!("mov {}, cr2", out(reg) cr2, options(nomem, nostack, preserves_flags)) };
-    panic!("EXCECAO #14 PAGE FAULT ao {} {:#x} ({}, {}{})\n{}",
-           if codigo & 0x10 != 0 { "executar" } else if codigo & 0x2 != 0 { "escrever em" } else { "ler" },
-           cr2,
-           if codigo & 0x1 != 0 { "pagina presente, sem permissao" } else { "pagina nao mapeada" },
-           if codigo & 0x4 != 0 { "modo usuario" } else { "modo kernel" },
-           if codigo & 0x8 != 0 { ", bit reservado na tabela" } else { "" },
-           quadro);
+    let acao = if codigo & 0x10 != 0 { "executar" } else if codigo & 0x2 != 0 { "escrever em" } else { "ler" };
+    let causa = if codigo & 0x1 != 0 { "pagina presente, sem permissao" } else { "pagina nao mapeada" };
+    let modo = if codigo & 0x4 != 0 { "modo usuario" } else { "modo kernel" };
+    let reservado = if codigo & 0x8 != 0 { ", bit reservado na tabela" } else { "" };
+    usuario::falha_do_programa(&quadro, "PAGE FAULT",
+                               format_args!("ao {} {:#x} ({}, {}{})", acao, cr2, causa, modo, reservado));
+    panic!("EXCECAO #14 PAGE FAULT ao {} {:#x} ({}, {}{})\n{}", acao, cr2, causa, modo, reservado, quadro);
 }
 
 /// #DF — uma exceção aconteceu ENQUANTO a CPU tentava entregar outra.

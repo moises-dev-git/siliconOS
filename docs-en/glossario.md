@@ -306,7 +306,39 @@ address other than the one expected in the file (the *ImageBase*).
 **System call (*syscall*)**
 : When a program asks the kernel for something (open a file, allocate
 memory), it executes a special instruction that moves the CPU to ring 0 in
-a controlled way.
+a controlled way. In SiliconOS, `int 0x80` (doc 10).
+
+**CPL / DPL / RPL**
+: CPL (*current privilege level*): the ring the CPU is in right now, in the
+low 2 bits of CS. DPL (*descriptor privilege level*): the ring required by a
+descriptor (segment, IDT entry). RPL (*requested privilege level*): the low
+2 bits of a selector.
+
+**TSS.RSP0**
+: The TSS field with the stack the CPU uses when it gets an interrupt in
+ring 3. The program never controls that stack.
+
+**`iretq`**
+: The instruction that returns from an interrupt, popping RIP, CS, RFLAGS,
+RSP and SS. With a hand-built frame, it is also how the kernel **enters**
+ring 3.
+
+**ABI** (*application binary interface*)
+: The contract at the machine-code level: which registers carry arguments
+and results, what the stack looks like. A calling convention and the list
+of system calls are part of the ABI.
+
+**Position-independent code**
+: Machine code that works at any address, because it only uses addresses
+relative to the current instruction (`[rip + ...]`).
+
+**Address space**
+: The set of translations (the page tables) a program sees. Real systems
+give one to each process.
+
+**SMEP / SMAP**
+: CPU protections (bits 20 and 21 of CR4) that stop the kernel from
+accidentally executing (SMEP) or accessing (SMAP) user pages.
 
 ---
 

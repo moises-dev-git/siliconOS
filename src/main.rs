@@ -25,6 +25,7 @@ mod serial;
 mod shell;
 #[cfg(test)]
 mod testes;
+mod usuario;
 
 use core::fmt::Write;
 use spin::Mutex;
@@ -143,6 +144,7 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     kprintln!("GDT do SiliconOS: base={:#x} limite={} CS={:#x} SS={:#x} DS={:#x} TR={:#x}",
               depois.base, depois.limite, depois.cs, depois.ss, depois.ds, depois.tr);
     kprintln!("Pilha IST1 (double fault): topo em {:#x}", gdt::topo_pilha_double_fault());
+    kprintln!("Pilha do anel 0 para o anel 3 (TSS.RSP0): topo em {:#x}", gdt::topo_pilha_anel0());
 
     // ---- IDT + exceções (docs/04-idt-e-excecoes.md) ----
     idt::init();

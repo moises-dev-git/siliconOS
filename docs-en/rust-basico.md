@@ -898,3 +898,101 @@ pub fn executar(testes: &[&dyn Testavel]) { ... }
 `core::any::type_name::<T>()` returns the name of type `T` as text. For a
 function, the type is its full path, and that is how each test prints its
 own name.
+
+---
+
+## 35. *Naked* functions and `naked_asm!`
+
+```rust
+#[unsafe(naked)]
+unsafe extern "sysv64" fn voltar_ao_kernel() -> ! {
+    naked_asm!(
+        "mov rsp, [rip + {rsp_kernel}]",
+        "pop r15", "pop r14", "pop r13", "pop r12", "pop rbp", "pop rbx",
+        "xor eax, eax",
+        "ret",
+        rsp_kernel = sym RSP_KERNEL,
+    )
+}
+```
+
+A regular function gets from the compiler a **prologue** (reserve stack
+space, save registers) and an **epilogue** (undo everything and `ret`). A
+**naked** function gets nothing: the body is **only** the `naked_asm!`
+assembly, and it is the one that must end with `ret`, `iretq` or a jump. It
+is for code that handles its own stack or the registers in a way the
+compiler does not understand, such as entering and leaving ring 3 (doc 10).
+
+- `#[unsafe(naked)]`: the attribute is marked `unsafe` because the compiler
+  checks nothing inside.
+- Difference from §15's `asm!` ([§15](#15-asm-assembly-inside-rust)): `asm!`
+  sits **inside** a normal function, and the compiler takes care of the rest;
+  `naked_asm!` **is** the whole function.
+- Special operands, which become text in the assembly:
+  - `sym NAME`: the address of a `static` or a function (`sym RSP_KERNEL`,
+    `sym tratar_syscall`);
+  - `const VALUE`: a number known at compile time
+    (`const gdt::USER_CODE as u64` becomes `35`).
+
+---
+
+## 36. `global_asm!` and external symbols
+
+```rust
+global_asm!(
+    ".section .rdata",
+    ".global programa_ola_inicio",
+    "programa_ola_inicio:",
+    "    lea rdi, [rip + ola_msg]",
+    ...
+);
+
+unsafe extern "C" {
+    static programa_ola_inicio: u8;
+}
+
+let p: *const u8 = &raw const programa_ola_inicio;
+```
+
+- **`global_asm!`** writes assembly outside any function, straight into the
+  object file: labels, data (`.ascii`), sections. Doc 10 uses it for the
+  user programs, which are not kernel functions.
+- **`.global NAME`** makes the label visible to the linker, like a public
+  symbol.
+- **`unsafe extern "C" { static NAME: u8; }`** declares, in Rust, that the
+  symbol exists somewhere. The type (`u8`) is just a starting point: what
+  matters is the **address**, obtained with `&raw const NAME` (a raw pointer,
+  without creating a reference).
+- **`unsafe impl Sync for Programa {}`**: a `static` can only hold `Sync`
+  types ("safe for several threads at once"), and raw pointers are not. The
+  promise here is that they point to fixed bytes of the executable, which
+  nobody changes.
+
+---
+
+## 37. Calling conventions: `extern "sysv64"`
+
+```rust
+unsafe extern "sysv64" fn entrar_no_anel3(rip: u64, rsp: u64) -> u64 { ... }
+extern "sysv64" fn tratar_syscall(r: &mut Registros) { ... }
+extern "x86-interrupt" fn page_fault(quadro: QuadroInterrupcao, codigo: u64) { ... }
+```
+
+The **calling convention** is the agreement, at the assembly level, on how a
+function receives arguments and returns its result: in which registers, who
+saves what, what the stack looks like. In Rust, `extern "NAME"` picks the
+convention:
+
+| Convention | Arguments | Where it appears |
+|---|---|---|
+| `"Rust"` (default) | unspecified: the compiler decides | regular functions |
+| `"C"` | the target system's. On the UEFI target: **Windows'** (RCX, RDX, R8, R9) | interfacing with C |
+| `"sysv64"` | **Linux/macOS'** (RDI, RSI, RDX, RCX, R8, R9) | doc 10's assembly |
+| `"x86-interrupt"` | the CPU frame; ends with `iretq` | handlers (doc 04) |
+
+When assembly calls a Rust function (`call {tratar}`) or is called by one,
+both sides must agree. Choosing `"sysv64"` explicitly guarantees that the
+first argument comes in RDI, as the assembly expects, regardless of the
+target. The convention also says which registers the called function must
+**preserve**: in `sysv64`, RBX, RBP and R12–R15. Those are exactly the ones
+`entrar_no_anel3` pushes.

@@ -60,6 +60,7 @@ book and then the matching document.
 | [07: Heap](07-heap.md) | `Box`, `Vec`, `String` inside the kernel: bump and free-list allocators | 8 | ✅ |
 | [08: Hardware interrupts](08-interrupcoes-de-hardware.md) | 8259, APIC and ACPI; 100 Hz timer; PS/2 keyboard; deadlock | 9 | ✅ |
 | [09: Shell and tests](09-shell-e-testes.md) | Interactive shell, `cargo test` in QEMU, debugging with GDB | 10 | ✅ |
+| [10: User mode](10-modo-usuario.md) | Ring 3, `iretq`, system calls (`int 0x80`), isolated programs | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 
@@ -149,6 +150,9 @@ siliconos/
     ├── console.rs  Draws text on the screen, pixel by pixel            [doc 01]
     ├── panic.rs    What to do when Rust detects an error               [doc 02]
     ├── shell.rs    The command line: editing, command table            [doc 09]
+    ├── usuario/    ("user")                                             [doc 10]
+    │   ├── mod.rs      entering/leaving ring 3, system calls
+    │   └── programas.rs  the user programs (assembly)
     ├── testes.rs   ("tests") the `cargo test` framework                [doc 09]
     ├── qemu.rs     Exits QEMU with a code (isa-debug-exit)             [doc 09]
     ├── gdt.rs      Segment table and emergency stack                   [doc 03]
@@ -197,6 +201,7 @@ The current execution flow, end to end:
                ├─ (interrupt tests, if built with a test feature)
                ├─ (cargo test: rodar_testes() runs the #[test_case]s and exits QEMU)
                └─ shell::rodar()         sleeps (hlt); each key goes to the shell
+                    └─ rodar <programa>  usuario::rodar(): ring 3 until the program ends
 ```
 
 ---

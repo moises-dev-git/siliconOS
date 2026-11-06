@@ -14,6 +14,7 @@
 - [07: Heap](07-heap.md)
 - [08: Hardware interrupts](08-interrupcoes-de-hardware.md)
 - [09: Shell and tests](09-shell-e-testes.md)
+- [10: User mode](10-modo-usuario.md)
 
 # Reference
 

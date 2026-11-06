@@ -31,8 +31,15 @@ pub fn milissegundos() -> u64 {
 
 /// O tratador: roda FREQUENCIA_HZ vezes por segundo, com as interrupções
 /// desligadas (interrupt gate). Precisa ser curto.
-pub extern "x86-interrupt" fn tratador(_quadro: QuadroInterrupcao) {
+pub extern "x86-interrupt" fn tratador(quadro: QuadroInterrupcao) {
     let t = TIQUES.fetch_add(1, Ordering::Relaxed) + 1;
+
+    // Interrompemos um programa de usuário que já passou do limite? Então o
+    // kernel retoma a CPU e o encerra (docs/10-modo-usuario.md).
+    if crate::usuario::tempo_esgotado(&quadro) {
+        apic::eoi();
+        crate::usuario::encerrar(crate::usuario::Resultado::TempoEsgotado);
+    }
 
     // `./run.sh teste-print-interrupcao`: imprimir de DENTRO do tratador.
     #[cfg(feature = "teste-print-interrupcao")]

@@ -889,3 +889,101 @@ pub fn executar(testes: &[&dyn Testavel]) { ... }
 `core::any::type_name::<T>()` devolve o nome do tipo `T` como texto. Para
 uma função, o tipo é o caminho completo dela, e é assim que cada teste
 imprime o próprio nome.
+
+---
+
+## 35. Funções *naked* e `naked_asm!`
+
+```rust
+#[unsafe(naked)]
+unsafe extern "sysv64" fn voltar_ao_kernel() -> ! {
+    naked_asm!(
+        "mov rsp, [rip + {rsp_kernel}]",
+        "pop r15", "pop r14", "pop r13", "pop r12", "pop rbp", "pop rbx",
+        "xor eax, eax",
+        "ret",
+        rsp_kernel = sym RSP_KERNEL,
+    )
+}
+```
+
+Uma função comum ganha do compilador um **prólogo** (reservar espaço na
+pilha, salvar registradores) e um **epílogo** (desfazer tudo e `ret`). Uma
+função **naked** ("nua") não ganha nada: o corpo é **só** o assembly do
+`naked_asm!`, e é ele que precisa terminar com `ret`, `iretq` ou um salto.
+Serve para o código que mexe na própria pilha ou nos registradores de um
+jeito que o compilador não entende, como entrar e sair do anel 3 (doc 10).
+
+- `#[unsafe(naked)]`: o atributo é marcado `unsafe` porque o compilador não
+  confere nada lá dentro.
+- Diferença para o `asm!` da [§15](#15-asm-assembly-dentro-do-rust): o `asm!`
+  fica **dentro** de uma função normal, e o compilador cuida do resto; o
+  `naked_asm!` **é** a função inteira.
+- Operandos especiais, que viram texto no assembly:
+  - `sym NOME`: o endereço de um `static` ou de uma função
+    (`sym RSP_KERNEL`, `sym tratar_syscall`);
+  - `const VALOR`: um número conhecido na compilação
+    (`const gdt::USER_CODE as u64` vira `35`).
+
+---
+
+## 36. `global_asm!` e símbolos externos
+
+```rust
+global_asm!(
+    ".section .rdata",
+    ".global programa_ola_inicio",
+    "programa_ola_inicio:",
+    "    lea rdi, [rip + ola_msg]",
+    ...
+);
+
+unsafe extern "C" {
+    static programa_ola_inicio: u8;
+}
+
+let p: *const u8 = &raw const programa_ola_inicio;
+```
+
+- **`global_asm!`** escreve assembly fora de qualquer função, direto no
+  arquivo objeto: rótulos, dados (`.ascii`), seções. O doc 10 o usa para os
+  programas de usuário, que não são funções do kernel.
+- **`.global NOME`** torna o rótulo visível para o linker, como um símbolo
+  público.
+- **`unsafe extern "C" { static NOME: u8; }`** declara, no Rust, que esse
+  símbolo existe em algum lugar. O tipo (`u8`) é só um ponto de partida:
+  interessa o **endereço**, obtido com `&raw const NOME` (um ponteiro cru,
+  sem criar referência).
+- **`unsafe impl Sync for Programa {}`**: uma `static` só pode guardar tipos
+  `Sync` ("seguros para várias threads ao mesmo tempo"), e ponteiros crus
+  não são. A promessa aqui é que eles apontam para bytes fixos do
+  executável, que ninguém altera.
+
+---
+
+## 37. Convenções de chamada: `extern "sysv64"`
+
+```rust
+unsafe extern "sysv64" fn entrar_no_anel3(rip: u64, rsp: u64) -> u64 { ... }
+extern "sysv64" fn tratar_syscall(r: &mut Registros) { ... }
+extern "x86-interrupt" fn page_fault(quadro: QuadroInterrupcao, codigo: u64) { ... }
+```
+
+A **convenção de chamada** é o acordo, no nível do assembly, sobre como uma
+função recebe argumentos e devolve o resultado: em quais registradores,
+quem salva o quê, como fica a pilha. Em Rust, `extern "NOME"` escolhe a
+convenção:
+
+| Convenção | Argumentos | Onde aparece |
+|---|---|---|
+| `"Rust"` (padrão) | não especificada: o compilador decide | funções comuns |
+| `"C"` | a do sistema-alvo. No alvo UEFI: a do **Windows** (RCX, RDX, R8, R9) | interface com C |
+| `"sysv64"` | a do **Linux/macOS** (RDI, RSI, RDX, RCX, R8, R9) | o assembly do doc 10 |
+| `"x86-interrupt"` | o quadro da CPU; termina com `iretq` | tratadores (doc 04) |
+
+Quando o assembly chama uma função Rust (`call {tratar}`) ou é chamado por
+ela, os dois lados precisam concordar. Escolher `"sysv64"` explicitamente
+garante que o primeiro argumento vem em RDI, como o assembly espera,
+independentemente do alvo. A convenção também diz quais registradores a
+função chamada precisa **preservar**: na `sysv64`, RBX, RBP e R12–R15. São
+exatamente os que `entrar_no_anel3` empilha.

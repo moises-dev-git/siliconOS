@@ -14,6 +14,7 @@
 - [07: Heap](07-heap.md)
 - [08: Interrupções de hardware](08-interrupcoes-de-hardware.md)
 - [09: Shell e testes](09-shell-e-testes.md)
+- [10: Modo usuário](10-modo-usuario.md)
 
 # Referência
 

@@ -27,6 +27,7 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Heap: lista de blocos livres, cresce sob demanda, páginas NX | `src/memoria/heap.rs` | [07](docs/07-heap.md) |
 | Interrupções de hardware: APIC via ACPI, timer a 100 Hz, teclado PS/2 | `src/interrupcoes/`, `src/acpi.rs` | [08](docs/08-interrupcoes-de-hardware.md) |
 | Shell, `cargo test` dentro do QEMU, depuração com GDB | `src/shell.rs`, `src/testes.rs` | [09](docs/09-shell-e-testes.md) |
+| Modo usuário: programas no anel 3, chamadas de sistema (`int 0x80`) | `src/usuario/` | [10](docs/10-modo-usuario.md) |
 
 ## Rodar
 

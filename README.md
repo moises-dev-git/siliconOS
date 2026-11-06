@@ -31,6 +31,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | Heap: free list, grows on demand, NX pages | `src/memoria/heap.rs` | [07](docs-en/07-heap.md) |
 | Hardware interrupts: APIC via ACPI, 100 Hz timer, PS/2 keyboard | `src/interrupcoes/`, `src/acpi.rs` | [08](docs-en/08-interrupcoes-de-hardware.md) |
 | Shell, `cargo test` inside QEMU, debugging with GDB | `src/shell.rs`, `src/testes.rs` | [09](docs-en/09-shell-e-testes.md) |
+| User mode: programs in ring 3, system calls (`int 0x80`) | `src/usuario/` | [10](docs-en/10-modo-usuario.md) |
 
 ## Running
 

@@ -92,6 +92,8 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "int", uso: "int", descricao: "contadores de interrupcoes", funcao: int },
     Comando { nome: "traduzir", uso: "traduzir <endereco>", descricao: "mostra a traducao de um endereco virtual", funcao: traduzir },
     Comando { nome: "ler", uso: "ler <endereco>", descricao: "le 8 bytes da memoria (pode dar page fault!)", funcao: ler },
+    Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
+    Comando { nome: "rodar", uso: "rodar <programa>", descricao: "roda um programa no anel 3", funcao: rodar_programa },
     Comando { nome: "reiniciar", uso: "reiniciar", descricao: "reinicia a maquina", funcao: reiniciar },
     Comando { nome: "desligar", uso: "desligar", descricao: "desliga a maquina (ACPI; testado so no QEMU)", funcao: desligar },
 ];
@@ -213,6 +215,29 @@ fn ler(argumentos: &[&str]) {
     // fault de propósito (`ler 0`). O kernel ainda não se recupera dele.
     let valor = unsafe { (endereco as *const u64).read_volatile() };
     kprintln!("[{:#x}] = {:#018x}", endereco, valor);
+}
+
+fn programas(_: &[&str]) {
+    for p in &crate::usuario::programas::PROGRAMAS {
+        kprintln!("  {:<14}{} ({} bytes)", p.nome, p.descricao, p.codigo().len());
+    }
+}
+
+fn rodar_programa(argumentos: &[&str]) {
+    use crate::usuario::{self, Resultado};
+    let Some(programa) = argumentos.first().and_then(|n| usuario::programas::procurar(n)) else {
+        kprintln!("uso: rodar <programa>   (veja 'programas')");
+        return;
+    };
+    match usuario::rodar(programa) {
+        Resultado::Saiu(codigo) =>
+            kprintln!("'{}' terminou: codigo de saida {}", programa.nome, codigo as i64),
+        Resultado::Falha { excecao, rip } =>
+            kprintln!("'{}' encerrado pelo kernel: {} em {:#x}", programa.nome, excecao, rip),
+        Resultado::TempoEsgotado =>
+            kprintln!("'{}' encerrado pelo kernel: passou de {} s sem terminar",
+                      programa.nome, usuario::LIMITE_TIQUES / timer::FREQUENCIA_HZ),
+    }
 }
 
 fn reiniciar(_: &[&str]) {
