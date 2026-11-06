@@ -294,6 +294,82 @@ computer**.
 **`hlt`**
 : Makes the CPU sleep until the next interrupt.
 
+**IRQ** (*interrupt request*)
+: A device's interrupt line. On the PC, numbers inherited from 1981: 0 =
+timer, 1 = keyboard, 4 = COM1, 8 = RTC, 12 = mouse (doc 08).
+
+**Interrupt handler**
+: The function the CPU runs when an interrupt arrives. It should be short
+and end with an EOI.
+
+**8259 PIC**
+: The original PC's interrupt controller: two cascaded chips, 15 IRQs, one
+CPU. Today it is turned off in favor of the APIC.
+
+**Local APIC**
+: The interrupt controller inside each CPU. It delivers interrupts to the
+core and has its own timer. MMIO registers at `0xFEE0_0000`.
+
+**I/O APIC**
+: A controller in the chipset that receives the devices' IRQs and forwards
+them, as vectors, to the local APIC of some CPU.
+
+**GSI** (*global system interrupt*)
+: The number of an I/O APIC input (pin). Normally IRQ *n* = GSI *n*, except
+for the overrides listed in the MADT.
+
+**EOI** (*end of interrupt*)
+: The handler's notice to the controller that it is done. Without it, the
+APIC delivers no more interrupts of that priority class.
+
+**Spurious interrupt**
+: A "ghost" interrupt: the controller started delivering it, but the signal
+disappeared. It has its own vector and takes no EOI.
+
+**Edge / level**
+: Edge-triggered: the interrupt is the change of the signal (one per
+event). Level-triggered: it continues while the signal is active.
+
+**MSR** (*model-specific register*)
+: CPU configuration registers identified by number, read with `rdmsr`.
+E.g. `0x1B` = the local APIC's address.
+
+**ACPI**
+: Tables the firmware leaves in memory describing the hardware. The path is
+RSDP → XSDT → tables such as the MADT.
+
+**MADT**
+: The ACPI table (signature `"APIC"`) that lists the CPUs, the I/O APICs
+and the IRQ overrides.
+
+**PIT** (8253/8254)
+: A 1981 timer with a fixed frequency of 1,193,182 Hz. Used to calibrate the
+APIC timer.
+
+**RTC** (CMOS clock)
+: A battery-backed clock that keeps the date and time, accessed through
+ports 0x70 and 0x71.
+
+**Tick**
+: Each timer interrupt. In SiliconOS, 100 per second.
+
+**Scancode**
+: The byte the keyboard sends for each key pressed (*make code*) or
+released (*break code* = make + 0x80). It says the key's position, not the
+letter.
+
+**PS/2 controller** ("8042")
+: The chip that receives the bytes from the PS/2 keyboard and mouse and
+hands them over through port 0x60, raising IRQ 1 (keyboard) or 12 (mouse).
+
+**Deadlock**
+: Two sides waiting for each other forever. In the kernel: a handler
+waiting for a lock that the code it interrupted is holding.
+
+**Spinlock**
+: A lock that waits by "spinning" in a loop (with the `pause` instruction)
+instead of sleeping. It is SiliconOS's `spin::Mutex`.
+
 ---
 
 ## CPU tables

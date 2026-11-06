@@ -291,6 +291,82 @@ computador**.
 **`hlt`**
 : Faz a CPU dormir até a próxima interrupção.
 
+**IRQ** (*interrupt request*)
+: Uma linha de interrupção de um dispositivo. No PC, números herdados de
+1981: 0 = timer, 1 = teclado, 4 = COM1, 8 = RTC, 12 = mouse (doc 08).
+
+**Tratador de interrupção** (*interrupt handler*)
+: A função que a CPU executa quando chega uma interrupção. Deve ser curta e
+terminar com EOI.
+
+**PIC 8259**
+: O controlador de interrupções do PC original: dois chips em cascata, 15
+IRQs, uma CPU. Hoje é desligado em favor do APIC.
+
+**APIC local**
+: Controlador de interrupções que fica dentro de cada CPU. Entrega as
+interrupções ao núcleo e tem um timer próprio. Registradores MMIO em
+`0xFEE0_0000`.
+
+**I/O APIC**
+: Controlador no chipset que recebe as IRQs dos dispositivos e as
+encaminha, como vetores, para o APIC local de alguma CPU.
+
+**GSI** (*global system interrupt*)
+: O número de uma entrada (pino) do I/O APIC. Normalmente IRQ *n* = GSI
+*n*, salvo os desvios listados na MADT.
+
+**EOI** (*end of interrupt*)
+: Aviso do tratador ao controlador de que terminou. Sem ele, o APIC não
+entrega mais interrupções daquela classe de prioridade.
+
+**Interrupção espúria**
+: Uma interrupção "fantasma": o controlador começou a entregá-la, mas o
+sinal sumiu. Tem vetor próprio e não leva EOI.
+
+**Borda / nível** (*edge / level*)
+: Disparo por borda: a interrupção é a mudança do sinal (uma por evento).
+Por nível: ela continua enquanto o sinal estiver ativo.
+
+**MSR** (*model-specific register*)
+: Registradores de configuração da CPU identificados por número, lidos com
+`rdmsr`. Ex.: `0x1B` = endereço do APIC local.
+
+**ACPI**
+: Tabelas que o firmware deixa na memória descrevendo o hardware. O caminho
+é RSDP → XSDT → tabelas como a MADT.
+
+**MADT**
+: Tabela ACPI (assinatura `"APIC"`) que lista as CPUs, os I/O APICs e os
+desvios de IRQ.
+
+**PIT** (8253/8254)
+: Timer de 1981, frequência fixa de 1 193 182 Hz. Usado para calibrar o
+timer do APIC.
+
+**RTC** (relógio CMOS)
+: Relógio com bateria que guarda data e hora, acessado pelas portas 0x70 e
+0x71.
+
+**Tique** (*tick*)
+: Cada interrupção do timer. No SiliconOS, 100 por segundo.
+
+**Scancode**
+: O byte que o teclado manda para cada tecla apertada (*make code*) ou
+solta (*break code* = make + 0x80). Diz a posição da tecla, não a letra.
+
+**Controlador PS/2** ("8042")
+: O chip que recebe os bytes do teclado e do mouse PS/2 e os entrega pela
+porta 0x60, disparando a IRQ 1 (teclado) ou 12 (mouse).
+
+**Deadlock**
+: Dois lados esperando um pelo outro para sempre. No kernel: um tratador
+esperando um lock que o código que ele interrompeu está segurando.
+
+**Spinlock**
+: Um lock que espera "girando" num laço (com a instrução `pause`) em vez de
+dormir. É o `spin::Mutex` do SiliconOS.
+
 ---
 
 ## Tabelas da CPU

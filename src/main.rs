@@ -6,9 +6,13 @@
 // tem um alocador global (src/memoria/heap.rs, docs/07-heap.md).
 extern crate alloc;
 
+mod acpi;
 mod console;
+mod cpu;
 mod gdt;
 mod idt;
+#[allow(dead_code)] // partes usadas só pelas features de teste
+mod interrupcoes;
 mod memoria;
 mod panic;
 mod serial;
@@ -40,6 +44,17 @@ macro_rules! kprint {
 }
 
 pub fn _print(args: core::fmt::Arguments) {
+    // Com as interrupções desligadas enquanto o lock do CONSOLE está pego,
+    // nenhum tratador consegue interromper no meio e pedir o mesmo lock
+    // (docs/08-interrupcoes-de-hardware.md). `teste-deadlock` tira essa
+    // proteção para mostrar o que acontece sem ela.
+    #[cfg(not(feature = "teste-deadlock"))]
+    cpu::sem_interrupcoes(|| escrever(args));
+    #[cfg(feature = "teste-deadlock")]
+    escrever(args);
+}
+
+fn escrever(args: core::fmt::Arguments) {
     let _ = Serial.write_fmt(args);
     if let Some(con) = CONSOLE.lock().as_mut() {
         let _ = con.write_fmt(args);
@@ -67,6 +82,9 @@ fn main() -> Status {
         }
     };
 
+    // Onde estão as tabelas ACPI (só o UEFI sabe; capítulo 9).
+    acpi::guardar_rsdp();
+
     uefi::println!("Desligando os servicos de boot do UEFI...");
     let memory_map = unsafe { uefi::boot::exit_boot_services(MemoryType::LOADER_DATA) };
 
@@ -77,6 +95,7 @@ fn main() -> Status {
 fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     // Interrupções desligadas: a IDT ainda é a do firmware e aponta para o
     // seletor de código DELE, que deixa de existir quando trocarmos a GDT.
+    // Elas só são religadas em interrupcoes::init() (doc 08).
     unsafe { core::arch::asm!("cli", options(nomem, nostack)) };
 
     Serial::init();
@@ -143,12 +162,97 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
         kprintln!("{}", v[i]);
     }
 
-    kprintln!();
-    kprintln!("Proxima etapa: interrupcoes de hardware (capitulo 9).");
+    // ---- Interrupções de hardware (docs/08-interrupcoes-de-hardware.md) ----
+    interrupcoes::init();
+    testes_de_interrupcoes();
 
+    kprintln!();
+    kprintln!("Proxima etapa: shell e testes (capitulo 10).");
+    kprintln!("Digite algo (teclado PS/2, layout americano):");
+    ecoar_teclado();
+}
+
+/// O laço principal, por enquanto: dorme até chegar uma interrupção; se for
+/// tecla, traduz o scancode e mostra o caractere.
+fn ecoar_teclado() -> ! {
+    use interrupcoes::teclado;
+    let mut decodificador = teclado::Decodificador::new();
     loop {
-        unsafe { core::arch::asm!("hlt") };
+        while let Some(scancode) = teclado::proximo_scancode() {
+            #[cfg(feature = "teste-teclado")]
+            kprintln!("  scancode {:#04x}", scancode);
+            if let Some(c) = decodificador.processar(scancode) {
+                kprint!("{}", c);
+            }
+        }
+        teclado::esperar();
     }
+}
+
+/// Testes das interrupções de hardware:
+///   ./run.sh teste-timer              confere o timer contra o relógio CMOS (RTC)
+///   ./run.sh teste-sem-eoi            tratador do timer sem EOI -> o timer para
+///   ./run.sh teste-print-interrupcao  kprint! dentro do tratador do timer: funciona
+///   ./run.sh teste-deadlock           o mesmo sem a proteção no _print -> trava
+fn testes_de_interrupcoes() {
+    use interrupcoes::timer;
+
+    #[cfg(feature = "teste-timer")]
+    {
+        // Espera o segundo do RTC virar, para começar no início de um segundo.
+        let mut s = timer::segundos_rtc();
+        while timer::segundos_rtc() == s {}
+        s = timer::segundos_rtc();
+        kprintln!("Teste timer: contando tiques a cada segundo do RTC (esperado: {})", timer::FREQUENCIA_HZ);
+        let mut inicio = timer::tiques();
+        let mut total = 0;
+        for _ in 0..5 {
+            while timer::segundos_rtc() == s {
+                unsafe { core::arch::asm!("hlt") }; // acorda a cada tique
+            }
+            s = timer::segundos_rtc();
+            let agora = timer::tiques();
+            kprintln!("  segundo {:>2} do RTC: {} tiques", s, agora - inicio);
+            total += agora - inicio;
+            inicio = agora;
+        }
+        let media = total / 5;
+        assert!(media.abs_diff(timer::FREQUENCIA_HZ) <= timer::FREQUENCIA_HZ / 10,
+                "timer fora de 10%: {} tiques por segundo", media);
+        kprintln!("Teste timer OK: media de {} tiques/s; {} ms desde que o timer ligou; espurias: {}",
+                  media, timer::milissegundos(), interrupcoes::espurias());
+    }
+
+    #[cfg(feature = "teste-sem-eoi")]
+    {
+        // Sem `hlt`: se o timer parar, nada mais acordaria a CPU.
+        kprintln!("Teste: tratador do timer SEM EOI. Esperando 2 s pelo RTC...");
+        for _ in 0..2 {
+            let s = timer::segundos_rtc();
+            while timer::segundos_rtc() == s {}
+        }
+        kprintln!("  tiques depois de 2 s: {} (com EOI seriam ~{})", timer::tiques(), 2 * timer::FREQUENCIA_HZ);
+        kprintln!("  teclas recebidas: {} (o teclado tambem ficou bloqueado?)",
+                  interrupcoes::teclado::recebidos());
+    }
+
+    #[cfg(feature = "teste-print-interrupcao")]
+    {
+        // O laço principal imprime sem parar; o tratador do timer imprime
+        // "[tique N]" a cada 10 tiques. Os dois disputam o lock do CONSOLE.
+        kprintln!("Teste: imprimindo no laco principal E no tratador do timer...");
+        let mut linha = 0u64;
+        while timer::tiques() < 300 {
+            linha += 1;
+            kprintln!("laco principal: linha {} (tiques: {})", linha, timer::tiques());
+            // Um respiro com as interrupções LIGADAS. Sem ele, a janela entre
+            // um kprintln! e o próximo tem poucas instruções e o QEMU quase
+            // nunca entrega o timer nela (ver doc 08).
+            for _ in 0..1000 { core::hint::spin_loop(); }
+        }
+        kprintln!("Teste OK: 300 tiques e {} linhas sem travar.", linha);
+    }
+    let _ = timer::tiques;
 }
 
 /// Provoca exceções de propósito, conforme a feature usada na compilação:

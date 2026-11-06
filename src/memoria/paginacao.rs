@@ -367,6 +367,27 @@ pub fn init(mapa: &Mapa, framebuffer: u64, tamanho_framebuffer: u64) -> Resumo {
     Resumo { raiz_uefi, raiz_kernel: pml4, quadros_usados }
 }
 
+/// Faixa virtual reservada para registradores de dispositivos (MMIO):
+/// APIC local, I/O APIC... Entrada 320 da PML4.
+pub const MMIO_INICIO: u64 = 0xFFFF_A000_0000_0000;
+static PROXIMO_MMIO: AtomicU64 = AtomicU64::new(MMIO_INICIO);
+
+/// Mapeia `tamanho` bytes de registradores de um dispositivo a partir do
+/// físico `fisico` e devolve o endereço virtual correspondente.
+/// SEM_CACHE: cada leitura e escrita tem que chegar ao dispositivo, nunca
+/// ficar no cache da CPU. SEM_EXECUCAO: ali não há código.
+pub fn mapear_mmio(fisico: u64, tamanho: u64) -> Result<u64, ErroMapeamento> {
+    let pagina = fisico & !(TAMANHO_QUADRO - 1);
+    let deslocamento = fisico - pagina;
+    let paginas = (deslocamento + tamanho).div_ceil(TAMANHO_QUADRO);
+    let virt = PROXIMO_MMIO.fetch_add(paginas * TAMANHO_QUADRO, Ordering::Relaxed);
+    for i in 0..paginas {
+        mapear(virt + i * TAMANHO_QUADRO, pagina + i * TAMANHO_QUADRO, TamanhoPagina::K4,
+               ESCRITA | SEM_CACHE | SEM_EXECUCAO)?;
+    }
+    Ok(virt + deslocamento)
+}
+
 /// Uma página fica livre por quadro do alocador: atalho para os testes.
 pub fn alocar_e_mapear(virt: u64, bits: u64) -> Result<Quadro, ErroMapeamento> {
     let q = quadros::alocar().ok_or(ErroMapeamento::SemMemoria)?;

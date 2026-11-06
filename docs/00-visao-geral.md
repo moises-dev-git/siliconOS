@@ -66,9 +66,9 @@ cada etapa dá ferramentas para a próxima:
 5. **Reagir ao hardware**: timer e teclado.
 6. **Rodar outros programas** de forma isolada e segura.
 
-O SiliconOS já concluiu as etapas 1 a 4: a memória física, a paginação e o
-heap estão prontos (docs 05 a 07). A próxima é a etapa 5, reagir ao
-hardware.
+O SiliconOS já concluiu as etapas 1 a 5: a memória (docs 05 a 07) e as
+interrupções de hardware, com timer e teclado (doc 08). A seguir vêm um
+shell interativo e, depois, a etapa 6.
 
 ---
 

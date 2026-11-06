@@ -662,3 +662,113 @@ static ALOCADOR: AlocadorLista = AlocadorLista;
 type, with no conversion at all. Doc 07 uses it to turn a heap address into
 a function pointer, in the NX test. It is one of Rust's most dangerous
 operations: use it only when there is no other way.
+
+---
+
+## 28. `Ordering::Acquire` and `Release`
+
+```rust
+// producer (the keyboard handler)
+FILA[e].store(scancode, Ordering::Relaxed);
+ESCRITA.store(proxima, Ordering::Release);
+
+// consumer (the main loop)
+if l == ESCRITA.load(Ordering::Acquire) { return None; }
+let scancode = FILA[l].load(Ordering::Relaxed);
+```
+
+§25 said that `Relaxed` is enough "when only the variable's own value
+matters". In the keyboard queue (doc 08) what matters is the **order
+between two variables**: the byte in `FILA[e]` must be written **before**
+`ESCRITA` moves forward. Otherwise the consumer would see the new position
+and read an old byte.
+
+Both the compiler and the CPU may reorder memory accesses that do not
+depend on each other. The `Release`/`Acquire` pair forbids that at the point
+that matters:
+
+- a **`Release`** write guarantees: everything that came before it in the
+  code becomes visible before it;
+- an **`Acquire`** read that sees that value guarantees: everything that
+  comes after it in the code sees what the other side wrote before the
+  `Release`.
+
+It is the same mechanism a `Mutex` uses inside (taking the lock =
+`Acquire`, releasing it = `Release`), and it is equivalent, in Java, to
+what `volatile` guarantees about earlier writes. With a single CPU, the
+risk comes from the compiler; with several, from the CPU too.
+
+To create an array of atomics in a `static`, where each element must be
+constructed (atomics are not `Copy`), you use a `const` block:
+
+```rust
+static FILA: [AtomicU8; 64] = [const { AtomicU8::new(0) }; 64];
+```
+
+---
+
+## 29. `#[repr(C, packed)]` and `read_unaligned`
+
+```rust
+#[repr(C, packed)]
+struct Cabecalho {
+    assinatura: [u8; 4],
+    tamanho: u32,
+    revisao: u8,
+    checksum: u8,
+    // ...
+}
+
+fn ler<T: Copy>(fisico: u64) -> T {
+    unsafe { (fisico_para_virtual(fisico) as *const T).read_unaligned() }
+}
+```
+
+Normally the compiler puts each field at an address that is a multiple of
+its size (a `u32` at a multiple of 4), inserting empty bytes (*padding*)
+between fields if needed. `packed` forbids that: the fields are glued
+together, exactly as in a format defined by someone else (here, the ACPI
+specification). `repr(C)` guarantees the order of the fields; `packed`, the
+absence of gaps.
+
+The price: a field may end up **misaligned**, and in Rust reading a
+misaligned value with `*pointer` or `pointer.read()` is undefined behavior.
+`read_unaligned()` is the read that accepts any address. For the same
+reason, Rust does not let you create a reference (`&cab.tamanho`) to a field
+of a `packed` struct; copying the value (`cab.tamanho`) is allowed.
+
+`<T: Copy>` makes the function **generic**: `ler::<u32>(p)` reads 4 bytes,
+`ler::<[u8; 4]>(p)` reads a signature, `ler::<Cabecalho>(p)` reads 36 bytes.
+It is like `<T> T ler(long p)` in Java, with the restriction that `T` can be
+copied bit by bit.
+
+---
+
+## 30. Taking a closure: `impl FnOnce`
+
+```rust
+pub fn sem_interrupcoes<R>(f: impl FnOnce() -> R) -> R {
+    // ... turns interrupts off
+    let resultado = f();
+    // ... turns them back on
+    resultado
+}
+
+cpu::sem_interrupcoes(|| escrever(args));
+```
+
+`impl FnOnce() -> R` means "any closure ([§16](#16-closures)) with no
+parameters that returns an `R`". It is like taking a `Supplier<R>` in Java
+or a function in JS, and it serves the "do something before, run the
+caller's code, do something after" pattern, like `try`/`finally` or
+Python's `with`.
+
+There are three variants: `FnOnce` (can be called once, the most
+permissive), `FnMut` (several times, may change what it captures) and `Fn`
+(several times, only reads). The compiler generates one version of
+`sem_interrupcoes` for each closure used, with no indirect-call cost.
+
+`core::mem::take(&mut x)` returns the value of `x` and leaves the default
+value in its place (`false`, `0`, `None`...). The keyboard decoder uses
+`if core::mem::take(&mut self.estendido) { ... }` to read and clear the
+flag in one operation.

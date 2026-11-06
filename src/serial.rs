@@ -38,10 +38,12 @@ impl Serial {
 impl fmt::Write for Serial {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for b in s.bytes() {
-            if b == b'\n' {
-                Serial::write_byte(b'\r');
+            match b {
+                b'\n' => { Serial::write_byte(b'\r'); Serial::write_byte(b'\n'); }
+                // Backspace no terminal: volta, escreve espaço por cima, volta.
+                0x08 => { Serial::write_byte(0x08); Serial::write_byte(b' '); Serial::write_byte(0x08); }
+                _ => Serial::write_byte(b),
             }
-            Serial::write_byte(b);
         }
         Ok(())
     }

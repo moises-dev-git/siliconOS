@@ -659,3 +659,110 @@ static ALOCADOR: AlocadorLista = AlocadorLista;
 tipo, sem conversão nenhuma. O doc 07 o usa para transformar um endereço
 do heap num ponteiro de função, no teste do NX. É uma das operações mais
 perigosas do Rust: use só quando não houver outra saída.
+
+---
+
+## 28. `Ordering::Acquire` e `Release`
+
+```rust
+// produtor (o tratador do teclado)
+FILA[e].store(scancode, Ordering::Relaxed);
+ESCRITA.store(proxima, Ordering::Release);
+
+// consumidor (o laço principal)
+if l == ESCRITA.load(Ordering::Acquire) { return None; }
+let scancode = FILA[l].load(Ordering::Relaxed);
+```
+
+A §25 disse que `Relaxed` basta "quando só importa o valor da própria
+variável". Na fila do teclado (doc 08) importa a **ordem entre duas
+variáveis**: o byte em `FILA[e]` precisa estar gravado **antes** de
+`ESCRITA` avançar. Senão o consumidor veria a posição nova e leria um byte
+velho.
+
+Tanto o compilador quanto a CPU podem reordenar acessos à memória que não
+dependem um do outro. O par `Release`/`Acquire` proíbe isso no ponto que
+importa:
+
+- uma escrita **`Release`** garante: tudo que veio antes dela no código fica
+  visível antes dela;
+- uma leitura **`Acquire`** que vê esse valor garante: tudo que vem depois
+  dela no código enxerga o que o outro lado gravou antes do `Release`.
+
+É o mesmo mecanismo que um `Mutex` usa por dentro (pegar o lock = `Acquire`,
+soltar = `Release`), e equivale, em Java, ao que `volatile` garante sobre as
+escritas anteriores. Com uma CPU só, o risco vem do compilador; com várias,
+também da CPU.
+
+Para criar um array de atômicos numa `static`, onde cada elemento precisa
+ser construído (atômicos não são `Copy`), usa-se um bloco `const`:
+
+```rust
+static FILA: [AtomicU8; 64] = [const { AtomicU8::new(0) }; 64];
+```
+
+---
+
+## 29. `#[repr(C, packed)]` e `read_unaligned`
+
+```rust
+#[repr(C, packed)]
+struct Cabecalho {
+    assinatura: [u8; 4],
+    tamanho: u32,
+    revisao: u8,
+    checksum: u8,
+    // ...
+}
+
+fn ler<T: Copy>(fisico: u64) -> T {
+    unsafe { (fisico_para_virtual(fisico) as *const T).read_unaligned() }
+}
+```
+
+Normalmente o compilador põe cada campo num endereço múltiplo do seu
+tamanho (um `u32` num múltiplo de 4), inserindo bytes vazios (*padding*)
+entre os campos se precisar. `packed` proíbe isso: os campos ficam colados,
+exatamente como no formato definido por outra pessoa (aqui, a especificação
+ACPI). `repr(C)` garante a ordem dos campos; `packed`, a ausência de buracos.
+
+O preço: um campo pode ficar **desalinhado**, e em Rust ler um valor
+desalinhado com `*ponteiro` ou `ponteiro.read()` é comportamento indefinido.
+`read_unaligned()` é a leitura que aceita qualquer endereço. Pelo mesmo
+motivo, o Rust não deixa criar uma referência (`&cab.tamanho`) para um
+campo de struct `packed`; copiar o valor (`cab.tamanho`) é permitido.
+
+`<T: Copy>` torna a função **genérica**: `ler::<u32>(p)` lê 4 bytes,
+`ler::<[u8; 4]>(p)` lê uma assinatura, `ler::<Cabecalho>(p)` lê 36 bytes. É
+como `<T> T ler(long p)` em Java, com a restrição de que `T` possa ser
+copiado bit a bit.
+
+---
+
+## 30. Receber uma closure: `impl FnOnce`
+
+```rust
+pub fn sem_interrupcoes<R>(f: impl FnOnce() -> R) -> R {
+    // ... desliga as interrupções
+    let resultado = f();
+    // ... religa
+    resultado
+}
+
+cpu::sem_interrupcoes(|| escrever(args));
+```
+
+`impl FnOnce() -> R` quer dizer "qualquer closure ([§16](#16-closures)) sem
+parâmetros que devolva um `R`". É como receber um `Supplier<R>` em Java ou
+uma função em JS, e serve para o padrão "faça algo antes, rode o código do
+chamador, faça algo depois", como o `try`/`finally` ou o `with` do Python.
+
+Existem três variantes: `FnOnce` (pode ser chamada uma vez, a mais
+permissiva), `FnMut` (várias vezes, pode alterar o que captura) e `Fn`
+(várias vezes, só lê). O compilador gera uma versão de `sem_interrupcoes`
+para cada closure usada, sem custo de chamada indireta.
+
+`core::mem::take(&mut x)` devolve o valor de `x` e deixa no lugar o valor
+padrão (`false`, `0`, `None`...). O decodificador do teclado usa
+`if core::mem::take(&mut self.estendido) { ... }` para ler e zerar a
+marca numa operação só.

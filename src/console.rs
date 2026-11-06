@@ -103,6 +103,11 @@ impl Console {
         match b {
             b'\n' => self.nova_linha(),
             b'\r' => self.col = 0,
+            // Backspace: volta uma coluna e apaga o caractere que estava lá.
+            0x08 => if self.col > 0 {
+                self.col -= 1;
+                self.desenhar_char(b' ', self.col, self.row);
+            },
             _ => {
                 if self.col >= self.cols() {
                     self.nova_linha();

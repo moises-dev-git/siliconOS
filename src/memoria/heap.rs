@@ -303,17 +303,21 @@ static HEAP: Mutex<Option<Heap>> = Mutex::new(None);
 pub struct AlocadorLista;
 
 unsafe impl GlobalAlloc for AlocadorLista {
+    // `sem_interrupcoes`: se um tratador de interrupção alocasse enquanto o
+    // código interrompido segura o lock do heap, seria deadlock (doc 08).
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        match HEAP.lock().as_mut() {
+        crate::cpu::sem_interrupcoes(|| match HEAP.lock().as_mut() {
             Some(h) => unsafe { h.alocar(layout) },
             None => ptr::null_mut(), // heap ainda não existe
-        }
+        })
     }
 
     unsafe fn dealloc(&self, ponteiro: *mut u8, layout: Layout) {
-        let mut guarda = HEAP.lock();
-        let h = guarda.as_mut().expect("heap nao inicializado");
-        unsafe { h.liberar(ponteiro, layout) };
+        crate::cpu::sem_interrupcoes(|| {
+            let mut guarda = HEAP.lock();
+            let h = guarda.as_mut().expect("heap nao inicializado");
+            unsafe { h.liberar(ponteiro, layout) };
+        })
     }
 }
 

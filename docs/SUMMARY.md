@@ -12,6 +12,7 @@
 - [05: Memória física](05-memoria-fisica.md)
 - [06: Paginação](06-paginacao.md)
 - [07: Heap](07-heap.md)
+- [08: Interrupções de hardware](08-interrupcoes-de-hardware.md)
 
 # Referência
 

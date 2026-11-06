@@ -29,7 +29,8 @@ OS or programmed in Rust. Each chapter's comments live in the
 | Memory map and frame allocator | `src/memoria/` | [05](docs-en/05-memoria-fisica.md) |
 | Paging | `src/memoria/paginacao.rs` | [06](docs-en/06-paginacao.md) |
 | Heap: free list, grows on demand, NX pages | `src/memoria/heap.rs` | [07](docs-en/07-heap.md) |
-| Hardware interrupts (timer, keyboard) | — | in progress |
+| Hardware interrupts: APIC via ACPI, 100 Hz timer, PS/2 keyboard | `src/interrupcoes/`, `src/acpi.rs` | [08](docs-en/08-interrupcoes-de-hardware.md) |
+| Interactive shell and tests | — | in progress |
 
 ## Running
 

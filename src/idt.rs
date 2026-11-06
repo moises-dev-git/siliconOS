@@ -4,7 +4,8 @@
 //!
 //! A IDT tem 256 entradas (vetores 0–255). Os vetores 0–31 são reservados
 //! para EXCEÇÕES da CPU (divisão por zero, page fault...). Os demais ficam
-//! para interrupções de hardware e software (capítulo 9).
+//! para interrupções de hardware e software: o timer (0x30) e o teclado
+//! (0x31) estão em src/interrupcoes/ (docs/08-interrupcoes-de-hardware.md).
 //!
 //! Os tratadores usam a convenção de chamada `extern "x86-interrupt"`
 //! (recurso do Rust nightly): o compilador gera o código que salva todos os
@@ -97,6 +98,14 @@ pub fn init() {
         t[DOUBLE_FAULT] = Entrada::new(double_fault as *const () as u64, gdt::IST_DOUBLE_FAULT);
         t[PROTECAO_GERAL] = Entrada::new(protecao_geral as *const () as u64, 0);
         t[PAGE_FAULT] = Entrada::new(page_fault as *const () as u64, 0);
+
+        // Interrupções de hardware (docs/08-interrupcoes-de-hardware.md).
+        use crate::interrupcoes::{self as int, teclado, timer};
+        t[int::VETOR_TIMER as usize] = Entrada::new(timer::tratador as *const () as u64, 0);
+        t[int::VETOR_TECLADO as usize] = Entrada::new(teclado::tratador as *const () as u64, 0);
+        for v in [int::VETOR_PIC_ESPURIO_1, int::VETOR_PIC_ESPURIO_2, int::VETOR_APIC_ESPURIO] {
+            t[v as usize] = Entrada::new(int::espuria as *const () as u64, 0);
+        }
         t
     });
 

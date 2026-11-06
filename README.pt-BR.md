@@ -25,7 +25,8 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Mapa de memória e alocador de quadros | `src/memoria/` | [05](docs/05-memoria-fisica.md) |
 | Paginação | `src/memoria/paginacao.rs` | [06](docs/06-paginacao.md) |
 | Heap: lista de blocos livres, cresce sob demanda, páginas NX | `src/memoria/heap.rs` | [07](docs/07-heap.md) |
-| Interrupções de hardware (timer, teclado) | — | em andamento |
+| Interrupções de hardware: APIC via ACPI, timer a 100 Hz, teclado PS/2 | `src/interrupcoes/`, `src/acpi.rs` | [08](docs/08-interrupcoes-de-hardware.md) |
+| Shell interativo e testes | — | em andamento |
 
 ## Rodar
 

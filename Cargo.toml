@@ -36,3 +36,11 @@ teste-heap-esgotar = []
 teste-heap-executar = []
 # Troca o alocador global pelo bump, para mostrar o limite dele
 teste-bump = []
+# Interrupções de hardware (docs/08-interrupcoes-de-hardware.md)
+teste-timer = []
+# Mostra cada scancode recebido
+teste-teclado = []
+teste-sem-eoi = []
+teste-print-interrupcao = []
+# Igual ao anterior, mas sem desligar as interrupções no kprintln!: trava
+teste-deadlock = ["teste-print-interrupcao"]

@@ -49,7 +49,7 @@ do livro e depois o documento correspondente.
 | [05: Memória física](05-memoria-fisica.md) | Mapa de memória, buracos, alocador de quadros (bitmap) | 6 | ✅ |
 | [06: Paginação](06-paginacao.md) | Endereços virtuais, tabelas de 4 níveis, TLB, as tabelas do kernel | 7 | ✅ |
 | [07: Heap](07-heap.md) | `Box`, `Vec`, `String` dentro do kernel: alocadores bump e lista de blocos livres | 8 | ✅ |
-| 08: Interrupções de hardware | Controlador de interrupções, timer, teclado | 9 | ⏳ |
+| [08: Interrupções de hardware](08-interrupcoes-de-hardware.md) | 8259, APIC e ACPI; timer a 100 Hz; teclado PS/2; deadlock | 9 | ✅ |
 | 09: Shell e testes | Shell interativo, testes no QEMU, depuração com GDB | 10 | ⏳ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
@@ -103,6 +103,11 @@ que o kernel o trata):
 | `./run.sh teste-heap-esgotar` | aloca 1 MiB por vez até o limite de 64 MiB (deve dar panic) | 07 |
 | `./run.sh teste-heap-executar` | executa código gravado no heap (deve dar page fault: NX) | 07 |
 | `./run.sh teste-bump` | troca o alocador pelo bump: a memória liberada nunca volta | 07 |
+| `./run.sh teste-timer` | confere os tiques do timer contra o relógio CMOS (RTC) | 08 |
+| `./run.sh teste-sem-eoi` | tratador do timer sem EOI (o timer para no 1º tique) | 08 |
+| `./run.sh teste-print-interrupcao` | `kprint!` dentro do tratador do timer (funciona) | 08 |
+| `./run.sh teste-deadlock` | o mesmo sem a proteção do `kprintln!` (deve travar) | 08 |
+| `./run.sh teste-teclado` | mostra cada scancode recebido do teclado | 08 |
 
 Para mudar a memória da máquina emulada (padrão: 128 MiB), use `RAM`, por
 exemplo `RAM=4G ./run.sh teste-quadros`.
@@ -125,6 +130,15 @@ siliconos/
     ├── panic.rs    O que fazer quando o Rust detecta um erro           [doc 02]
     ├── gdt.rs      Tabela de segmentos e pilha de emergência           [doc 03]
     ├── idt.rs      Tabela de interrupções e tratadores de exceções     [doc 04]
+    ├── cpu.rs      cli/sti, sem_interrupcoes, leitura de MSR           [doc 08]
+    ├── acpi.rs     acha a MADT: onde estão os controladores            [doc 08]
+    ├── interrupcoes/                                                    [doc 08]
+    │   ├── mod.rs      vetores e a sequência de inicialização
+    │   ├── pic.rs      desliga o 8259 antigo
+    │   ├── apic.rs     APIC local (dentro da CPU)
+    │   ├── ioapic.rs   I/O APIC (IRQs dos dispositivos)
+    │   ├── timer.rs    timer do APIC calibrado com o PIT; RTC
+    │   └── teclado.rs  PS/2: fila sem lock e tradução de scancodes
     └── memoria/                                                         [doc 05]
         ├── mod.rs      constantes (tamanho do quadro, 1 MiB)
         ├── mapa.rs     cópia própria do mapa de memória do UEFI
@@ -142,7 +156,7 @@ O fluxo de execução atual, de ponta a ponta:
          ├─ descobre onde fica a tela
          ├─ exit_boot_services()    ← dispensa o firmware, recebe o mapa de memória
          └─► kernel_main()          [main.rs]  a partir daqui a máquina é nossa
-               ├─ cli                    desliga interrupções de hardware
+               ├─ cli                    desliga interrupções de hardware (até o doc 08)
                ├─ Serial::init()         [serial.rs]
                ├─ Console::new()         [console.rs]
                ├─ gdt::init()            [gdt.rs]
@@ -156,7 +170,9 @@ O fluxo de execução atual, de ponta a ponta:
                ├─ memoria::heap::init()  mapeia 1 MiB e liga o alocador global
                ├─ demonstrar_heap()      Box, Vec e String no boot normal
                ├─ (testes do heap, se compilado com alguma feature de teste)
-               └─ loop { hlt }           dorme para sempre
+               ├─ interrupcoes::init()   ACPI, 8259, APICs, timer, teclado e sti
+               ├─ (testes de interrupção, se compilado com alguma feature de teste)
+               └─ ecoar_teclado()        dorme (hlt) e mostra cada tecla digitada
 ```
 
 ---
