@@ -19,6 +19,8 @@
 > *map*/*unmap*, `traduzir` = *translate*, `tabela` = *table*, `entrada` =
 > *entry*, `fisico` = *physical*, `deslocamento` = *offset*, `nivel` =
 > *level*, `tamanho` = *size*.
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -621,6 +623,23 @@ The 12 tests from the previous chapters (panic, the 6 exceptions, frames,
 double free) passed with the new tables. In particular, the **double fault
 still works**: the IST1 stack is a kernel `static`, covered by the
 identity.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of the previous one. Docs 00 to 06 are in
+the repository's first commit: each file's link leads to the code **at the
+end of doc 06**, which may already contain what later chapters add.
+
+| File | What changes | Where |
+|---|---|---|
+| [`src/memoria/paginacao.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | **new**: `flags`, `Entrada`, `Tabela`, `traduzir`, `mapear`/`desmapear` (and the `_em` versions), `init`, `fisico_para_virtual`, `alocar_e_mapear` | — |
+| [`src/memoria/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mod.rs) | `pub mod paginacao;` | with the other `pub mod`s |
+| [`src/memoria/quadros.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | `reposicionar_bitmap` (called at the end of `paginacao::init`) | end of the file |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | in `kernel_main`: reads RSP, `explicar_traducao` before, `memoria::paginacao::init(mapa, fb.base, tamanho_fb)`, `explicar_traducao` after and `testes_de_paginacao()` | after `testes_de_memoria()` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `fn explicar_traducao`, `fn testes_de_paginacao` | after `testes_de_memoria` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `teste-paginacao`, `teste-desmapeado`, `teste-nulo` | `[features]` |
 
 ---
 

@@ -13,6 +13,8 @@
 > `static` ([§10](rust-basico.md#10-static-and-const)),
 > `Mutex` ([§11](rust-basico.md#11-mutex-and-once-from-the-spin-crate)),
 > `asm!` ([§15](rust-basico.md#15-asm-assembly-inside-rust))
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -422,6 +424,23 @@ kprintln!("Video: {}x{} (stride {})", fb.width, fb.height, fb.stride);
 Running in QEMU with no window (`SEM_TELA=1 ./run.sh`), the `serial.log`
 file receives every line, and a screenshot taken through the QEMU monitor
 shows the same text drawn in white on dark blue.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of the previous one. Docs 00 to 06 are in
+the repository's first commit: each file's link leads to the code **at the
+end of doc 06**, which may already contain what later chapters add.
+
+| File | What changes | Where |
+|---|---|---|
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | dependencies `font8x8` (no default features) and `spin` (features `spin_mutex` and `once`) | `[dependencies]` |
+| [`src/serial.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | **new**: `Serial::init`, `write_byte`, `impl fmt::Write`, `outb`/`inb` | — |
+| [`src/console.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | **new**: `FrameBuffer`, `Console` (draw character, scroll, new line), `impl fmt::Write` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod console; mod serial;`, the `static CONSOLE`, the `kprintln!`/`kprint!` macros and `fn _print` | top of the file, after the `use`s |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | in `main()`: block that opens GOP and builds the `FrameBuffer`; `fb` becomes an argument of `kernel_main` | before `exit_boot_services` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | in `kernel_main`: `Serial::init();`, `*CONSOLE.lock() = Some(Console::new(fb));` and the first messages | right after `cli` |
 
 ---
 

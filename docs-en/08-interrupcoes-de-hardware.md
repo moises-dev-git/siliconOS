@@ -27,6 +27,8 @@
 > `rotear` = *route*, `calibrar` = *calibrate*, `esperar` = *wait*,
 > `ligar`/`desligar` = *turn on/off*, `sem_interrupcoes` = *without
 > interrupts*, `espuria` = *spurious*, `ecoar` = *echo*.
+>
+> **Code for this chapter:** [state at the end of doc 08](https://github.com/moises-dev-git/siliconOS/tree/doc-08) · [what changed since doc 07](https://github.com/moises-dev-git/siliconOS/compare/doc-07...doc-08) · map in [Changes to the files](#changes-to-the-files)
 
 ---
 
@@ -1151,6 +1153,35 @@ All 21 builds (the 17 features from the earlier chapters, the normal boot
 and the new `teste-timer`, `teste-sem-eoi` and `teste-print-interrupcao`)
 were run again, and all gave the expected result. `teste-deadlock` freezes,
 as it should.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of doc 07 (tag `doc-07`). Each file's link
+leads to its state at the end of this chapter (tag `doc-08`); every changed line
+is in the [comparison between the two tags](https://github.com/moises-dev-git/siliconOS/compare/doc-07...doc-08).
+
+| File | What changes | Where |
+|---|---|---|
+| [`src/cpu.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | **new**: `ligar_interrupcoes`, `desligar_interrupcoes`, `interrupcoes_ligadas`, `sem_interrupcoes`, `ler_msr` | — |
+| [`src/acpi.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | **new**: `guardar_rsdp`, `Cabecalho`, `Madt` (with `rotear_irq`), `madt`, `procurar_tabela`, `ler_madt` | — |
+| [`src/interrupcoes/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/mod.rs) | **new**: the vectors, `espuria`, `init` (the ACPI → 8259 → APIC → I/O APIC → timer → keyboard → `sti` sequence) | — |
+| [`src/interrupcoes/pic.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/pic.rs) | **new**: `desligar` | — |
+| [`src/interrupcoes/apic.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | **new**: registers, `ler`/`escrever`, `eoi`, `id`, `init` | — |
+| [`src/interrupcoes/ioapic.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | **new**: `init`, `rotear`, `entrada` | — |
+| [`src/interrupcoes/timer.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | **new**: `TIQUES`, `tratador`, `calibrar` (PIT), `iniciar`, `segundos_rtc` | — |
+| [`src/interrupcoes/teclado.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | **new**: the lock-free queue, `tratador`, `proximo_scancode`, `esperar`, `init` (8042), `Decodificador` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | `mod acpi; mod cpu;` and `#[allow(dead_code)] mod interrupcoes;` | with the other `mod`s |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | `_print` becomes `cpu::sem_interrupcoes(\|\| escrever(args))`; the old body becomes `fn escrever` (with `#[cfg]` for the `teste-deadlock` feature) | `fn _print` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | `acpi::guardar_rsdp();` | in `main()`, before `exit_boot_services` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | in `kernel_main`: `interrupcoes::init(); testes_de_interrupcoes();`; the final `loop { hlt }` is replaced by `ecoar_teclado()`; new functions `ecoar_teclado` and `testes_de_interrupcoes` | after `testes_de_heap()` |
+| [`src/idt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/idt.rs) | entries for vectors 0x30 (timer), 0x31 (keyboard) and the spurious ones (0x27, 0x2F, 0xFF) | in `init`, after the `PAGE_FAULT` line |
+| [`src/memoria/paginacao.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/memoria/paginacao.rs) | `MMIO_INICIO`, `PROXIMO_MMIO` and `mapear_mmio` | before `alocar_e_mapear` |
+| [`src/memoria/heap.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/memoria/heap.rs) | the bodies of `alloc` and `dealloc` inside `crate::cpu::sem_interrupcoes(...)` | `impl GlobalAlloc for AlocadorLista` |
+| [`src/console.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/console.rs) | `0x08` (backspace) arm in the `match` | `write_byte` |
+| [`src/serial.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/serial.rs) | `match` on `\n` (sends `\r\n`) and `0x08` (sends back, space, back) | `write_str` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-08/Cargo.toml) | `teste-timer`, `teste-teclado`, `teste-sem-eoi`, `teste-print-interrupcao`, `teste-deadlock = ["teste-print-interrupcao"]` | `[features]` |
 
 ---
 

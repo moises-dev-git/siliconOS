@@ -20,6 +20,8 @@
 > *frame(s)*, `regiao/regioes` = *region(s)*, `inicio`/`fim` = *start*/*end*,
 > `livre(s)` = *free*, `ocupado` = *used*, `alocar`/`liberar` =
 > *allocate*/*free*.
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -619,6 +621,23 @@ shows that the kernel cannot assume it is at low addresses.
 
 `teste-panic`, `teste-breakpoint` and `teste-doublefault` were run again,
 with the same result as before.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of the previous one. Docs 00 to 06 are in
+the repository's first commit: each file's link leads to the code **at the
+end of doc 06**, which may already contain what later chapters add.
+
+| File | What changes | Where |
+|---|---|---|
+| [`src/memoria/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mod.rs) | **new**: `pub mod mapa; pub mod quadros;`, `TAMANHO_QUADRO`, `INICIO_UTILIZAVEL` | — |
+| [`src/memoria/mapa.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | **new**: `Tipo`, `Regiao`, `Mapa`, `init`, `get` | — |
+| [`src/memoria/quadros.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | **new**: `Quadro`, `AlocadorQuadros` (bitmap), `QUADROS`, `init`, `alocar`, `liberar`, `livres` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod memoria;`; in `kernel_main`: `memoria::mapa::init(memory_map)`, `imprimir_mapa(mapa, fb)`, `memoria::quadros::init(mapa)`, `imprimir_alocador()`, `testes_de_memoria()` | after `testes_de_excecao()` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `fn imprimir_mapa`, `fn imprimir_alocador`, `fn testes_de_memoria` | after `testes_de_excecao` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `teste-quadros`, `teste-liberacao-dupla`, `listar-regioes` | `[features]` |
 
 ---
 

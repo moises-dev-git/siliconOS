@@ -7,6 +7,8 @@
 >
 > **Main file:** `src/main.rs`
 > **Book:** chapters 1 and 2
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -324,6 +326,22 @@ Project dependencies (crates), declared in `Cargo.toml`:
 | `uefi` | talking to the firmware in phase 1 (video, memory map, exit_boot_services) |
 | `spin` | `Mutex` and `Once` that work without an operating system |
 | `font8x8` | the drawing of the letters (a table of bits) |
+
+---
+
+## Changes to the files
+
+Where the code starts. Docs 00 to 06 are in the repository's first commit, so
+there is no snapshot of each one: the link in each file leads to the code
+**at the end of doc 06**, which already has what the following chapters add.
+The prerequisites (nightly Rust, the `x86_64-unknown-uefi` target, QEMU and
+OVMF) are in the introduction, section "How to build and run".
+
+| File | What changes | Where |
+|---|---|---|
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | **new**: package `siliconos`, edition 2024, dependency `uefi = { version = "0.33.0", features = ["logger"] }` | project root |
+| [`run.sh`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/run.sh) | **new**: builds with `cargo build --target x86_64-unknown-uefi`, copies to `esp/EFI/BOOT/BOOTX64.efi` and opens QEMU with OVMF | project root |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | **new**: `#![no_std]`, `#![no_main]`, `#[entry] fn main()` (starts the UEFI helpers, writes a message, calls `exit_boot_services`) and `fn kernel_main(...) -> !`, which starts with `cli` and ends in `loop { hlt }` | — |
 
 ---
 

@@ -12,6 +12,8 @@
 > `Once` ([§11](rust-basico.md#11-mutex-e-once-da-crate-spin)),
 > closures ([§16](rust-basico.md#16-closures))
 > **Leia antes:** a seção "Bits, bytes e hexadecimal" do [glossário](glossario.md#bits-bytes-e-hexadecimal-revisão-rápida)
+>
+> **Código deste capítulo:** os docs 00 a 06 estão num único commit: [estado no fim do doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). O que este capítulo acrescenta está em [Mudanças nos arquivos](#mudanças-nos-arquivos).
 
 ---
 
@@ -509,6 +511,19 @@ Se algum bit de um descritor estivesse errado, a CPU teria recusado o
 `retfq` ou o `ltr` com uma exceção, e a máquina teria reiniciado (com o
 QEMU em `-no-reboot`, ele simplesmente fecharia). O fato de o boot seguir
 normalmente já é uma prova de que os descritores são válidos.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do anterior. Os docs 00 a 06 estão
+no primeiro commit do repositório: o link de cada arquivo leva ao código
+**no fim do doc 06**, que pode já ter o que os capítulos seguintes acrescentam.
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/gdt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | **novo**: seletores, descritores, `Tss`, pilha IST1, `init`, `estado`, `topo_pilha_double_fault` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod gdt;`; em `kernel_main`: `gdt::estado()` (antes), `gdt::init()`, `gdt::estado()` (depois) e os `kprintln!` das duas GDTs e da IST1 | depois das primeiras mensagens |
 
 ---
 

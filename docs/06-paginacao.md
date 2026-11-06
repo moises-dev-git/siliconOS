@@ -14,6 +14,8 @@
 > **Rust novo aqui:** o operador `?` ([§24](rust-basico.md#24-o-operador--propagar-erros)),
 > atômicos ([§25](rust-basico.md#25-atômicos-atomicu64-atomicbool)),
 > `#[repr(transparent)]` ([§13](rust-basico.md#13-atributos--e-))
+>
+> **Código deste capítulo:** os docs 00 a 06 estão num único commit: [estado no fim do doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). O que este capítulo acrescenta está em [Mudanças nos arquivos](#mudanças-nos-arquivos).
 
 ---
 
@@ -603,6 +605,23 @@ Os 12 testes dos capítulos anteriores (panic, as 6 exceções, quadros,
 liberação dupla) passaram com as tabelas novas. Em especial, o
 **double fault continua funcionando**: a pilha IST1 é um `static` do kernel,
 coberto pela identidade.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do anterior. Os docs 00 a 06 estão
+no primeiro commit do repositório: o link de cada arquivo leva ao código
+**no fim do doc 06**, que pode já ter o que os capítulos seguintes acrescentam.
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/memoria/paginacao.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | **novo**: `flags`, `Entrada`, `Tabela`, `traduzir`, `mapear`/`desmapear` (e as versões `_em`), `init`, `fisico_para_virtual`, `alocar_e_mapear` | — |
+| [`src/memoria/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mod.rs) | `pub mod paginacao;` | junto dos outros `pub mod` |
+| [`src/memoria/quadros.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | `reposicionar_bitmap` (chamada no fim de `paginacao::init`) | fim do arquivo |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | em `kernel_main`: lê o RSP, `explicar_traducao` antes, `memoria::paginacao::init(mapa, fb.base, tamanho_fb)`, `explicar_traducao` depois e `testes_de_paginacao()` | depois de `testes_de_memoria()` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `fn explicar_traducao`, `fn testes_de_paginacao` | depois de `testes_de_memoria` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `teste-paginacao`, `teste-desmapeado`, `teste-nulo` | `[features]` |
 
 ---
 

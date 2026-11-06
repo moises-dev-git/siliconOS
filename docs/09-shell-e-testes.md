@@ -18,6 +18,8 @@
 > `let ... else` e `split_first` ([§32](rust-basico.md#32-let--else-e-split_first)),
 > `#[cfg(test)]` e o framework de testes próprio ([§33](rust-basico.md#33-testes-cfgtest-e-test_case)),
 > `dyn Trait` e implementação para todo `T` ([§34](rust-basico.md#34-dyn-trait-e-implementar-para-todo-t))
+>
+> **Código deste capítulo:** [estado no fim do doc 09](https://github.com/moises-dev-git/siliconOS/tree/doc-09) · [o que mudou desde o doc 08](https://github.com/moises-dev-git/siliconOS/compare/doc-08...doc-09) · mapa em [Mudanças nos arquivos](#mudanças-nos-arquivos)
 
 ---
 
@@ -781,6 +783,34 @@ de um arquivo ou de um *pipe*, como foi feito para gerar as saídas acima.
 - **GDB:** as sessões da seção 4.4.
 - **Regressão:** as 21 builds de antes (boot normal e 20 features) deram o
   resultado esperado.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do doc 08 (tag `doc-08`). O link de
+cada arquivo leva ao estado dele no fim deste capítulo (tag `doc-09`); todas as
+linhas que mudaram estão na [comparação entre as duas tags](https://github.com/moises-dev-git/siliconOS/compare/doc-08...doc-09).
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/shell.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | **novo**: `Shell` (`tecla`), `rodar`, `Comando`, `COMANDOS`, `executar`, `ler_numero` e uma função por comando | — |
+| [`src/testes.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/testes.rs) | **novo**: `Testavel`, `executar` (o *runner*) e o teste da feature `teste-que-falha` | — |
+| [`src/qemu.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/qemu.rs) | **novo**: `Saida`, `sair` (porta 0xF4) | — |
+| [`.cargo/config.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/.cargo/config.toml) | **novo**: `[target.x86_64-unknown-uefi]` com `runner = "./testar.sh"` | — |
+| [`testar.sh`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/testar.sh) | **novo** (executável): roda o `.efi` de teste no QEMU com `isa-debug-exit` e traduz 33/35/124 | raiz do projeto |
+| [`depurar.sh`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/depurar.sh) | **novo** (executável): compila com `/debug:symtab`, sobe o QEMU com `-s`, lê a base e abre o GDB | raiz do projeto |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/main.rs) | `#![feature(custom_test_frameworks)]`, `#![test_runner(crate::testes::executar)]`, `#![reexport_test_harness_main = "rodar_testes"]` | topo, depois de `#![feature(abi_x86_interrupt)]` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/main.rs) | `#[cfg_attr(not(test), allow(dead_code))] mod qemu;`, `mod shell;`, `#[cfg(test)] mod testes;` | junto dos outros `mod` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/main.rs) | `static IMAGEM_BASE` e `IMAGEM_TAMANHO` (`AtomicU64`); em `main()`, bloco que abre o `LoadedImage` e as preenche; em `kernel_main`, o `kprintln!` "Imagem do kernel" | depois de `CONSOLE`; depois de `guardar_rsdp()`; depois da linha do vídeo |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/main.rs) | `#[cfg(test)] rodar_testes();`; `ecoar_teclado` sai e o fim de `kernel_main` vira `shell::rodar()` | depois de `testes_de_interrupcoes()` |
+| [`src/panic.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/panic.rs) | `#[cfg(test)]` escreve `[FALHOU]` e chama `qemu::sair(Falha)`; `#[cfg(not(test))] parar();` | fim da função `panic` |
+| [`src/cpu.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/cpu.rs) | `reiniciar` (8042 + triple fault) | fim do arquivo |
+| [`src/acpi.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | `desligar` (FADT + S5) e `tipo_s5` | fim do arquivo |
+| [`src/interrupcoes/timer.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/timer.rs) | `hora_rtc` | fim do arquivo |
+| [`src/serial.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/serial.rs) | `outw` e `inw` | antes de `inb` |
+| vários | um bloco `#[cfg(test)] mod testes { ... }` com `#[test_case]` em `acpi.rs`, `cpu.rs`, `interrupcoes/teclado.rs`, `interrupcoes/timer.rs`, `memoria/heap.rs`, `memoria/paginacao.rs`, `memoria/quadros.rs` e `shell.rs` | fim de cada arquivo |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-09/Cargo.toml) | `teste-que-falha = []` | `[features]` |
 
 ---
 

@@ -13,6 +13,8 @@
 > **Read first:** doc 02 (panic) and doc 03 (GDT, TSS and IST)
 > **New Rust here:** `extern "x86-interrupt"` (section 5 of this doc),
 > `impl Display` (section 4)
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -628,6 +630,22 @@ All run in QEMU with `SEM_TELA=1 ./run.sh <feature>`:
 | `teste-doublefault` **without IST** (temporary test) | triple fault: QEMU closes in 2 s with no message |
 
 In every case there was a single boot, with no unexpected reset.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of the previous one. Docs 00 to 06 are in
+the repository's first commit: each file's link leads to the code **at the
+end of doc 06**, which may already contain what later chapters add.
+
+| File | What changes | Where |
+|---|---|---|
+| [`src/idt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | **new**: `Entrada`, `QuadroInterrupcao`, `init`, `estado` and the #DE #BP #UD #DF #GP #PF handlers | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `#![feature(abi_x86_interrupt)]` | top, after `#![no_main]` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod idt;`; in `kernel_main`: `idt::init()`, the IDT `kprintln!` and `testes_de_excecao()` | right after the GDT block |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `fn testes_de_excecao()` | after `kernel_main` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `teste-breakpoint`, `teste-divisao`, `teste-opcode`, `teste-pagefault`, `teste-gpf`, `teste-doublefault` | `[features]` |
 
 ---
 

@@ -12,6 +12,8 @@
 > `Once` ([§11](rust-basico.md#11-mutex-and-once-from-the-spin-crate)),
 > closures ([§16](rust-basico.md#16-closures))
 > **Read first:** the "Bits, bytes and hexadecimal" section of the [glossary](glossario.md#bits-bytes-and-hexadecimal-quick-review)
+>
+> **Code for this chapter:** docs 00 to 06 are in a single commit: [state at the end of doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). What this chapter adds is in [Changes to the files](#changes-to-the-files).
 
 ---
 
@@ -515,6 +517,19 @@ If any bit of a descriptor were wrong, the CPU would have refused the
 `retfq` or the `ltr` with an exception, and the machine would have reset
 (with QEMU in `-no-reboot`, it would simply close). The fact that boot
 continues normally is already proof that the descriptors are valid.
+
+---
+
+## Changes to the files
+
+What this chapter adds to the code of the previous one. Docs 00 to 06 are in
+the repository's first commit: each file's link leads to the code **at the
+end of doc 06**, which may already contain what later chapters add.
+
+| File | What changes | Where |
+|---|---|---|
+| [`src/gdt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | **new**: selectors, descriptors, `Tss`, IST1 stack, `init`, `estado`, `topo_pilha_double_fault` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod gdt;`; in `kernel_main`: `gdt::estado()` (before), `gdt::init()`, `gdt::estado()` (after) and the `kprintln!`s for both GDTs and IST1 | after the first messages |
 
 ---
 

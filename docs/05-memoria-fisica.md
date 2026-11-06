@@ -15,6 +15,8 @@
 > slices ([§21](rust-basico.md#21-slices-um-pedaço-de-um-array)),
 > *newtype* ([§22](rust-basico.md#22-newtype-um-tipo-próprio-para-um-número)),
 > `assert!` e `expect` ([§23](rust-basico.md#23-assert-e-expect-verificações-que-viram-panic))
+>
+> **Código deste capítulo:** os docs 00 a 06 estão num único commit: [estado no fim do doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). O que este capítulo acrescenta está em [Mudanças nos arquivos](#mudanças-nos-arquivos).
 
 ---
 
@@ -593,6 +595,23 @@ ocupado (ele está coberto pelo bitmap, mas nunca foi "liberado"). O caso de
 
 `teste-panic`, `teste-breakpoint` e `teste-doublefault` foram rodados de
 novo, com o mesmo resultado de antes.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do anterior. Os docs 00 a 06 estão
+no primeiro commit do repositório: o link de cada arquivo leva ao código
+**no fim do doc 06**, que pode já ter o que os capítulos seguintes acrescentam.
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/memoria/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mod.rs) | **novo**: `pub mod mapa; pub mod quadros;`, `TAMANHO_QUADRO`, `INICIO_UTILIZAVEL` | — |
+| [`src/memoria/mapa.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | **novo**: `Tipo`, `Regiao`, `Mapa`, `init`, `get` | — |
+| [`src/memoria/quadros.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | **novo**: `Quadro`, `AlocadorQuadros` (bitmap), `QUADROS`, `init`, `alocar`, `liberar`, `livres` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod memoria;`; em `kernel_main`: `memoria::mapa::init(memory_map)`, `imprimir_mapa(mapa, fb)`, `memoria::quadros::init(mapa)`, `imprimir_alocador()`, `testes_de_memoria()` | depois de `testes_de_excecao()` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `fn imprimir_mapa`, `fn imprimir_alocador`, `fn testes_de_memoria` | depois de `testes_de_excecao` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `teste-quadros`, `teste-liberacao-dupla`, `listar-regioes` | `[features]` |
 
 ---
 

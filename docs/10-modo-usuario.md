@@ -22,6 +22,8 @@
 > **Rust novo aqui:** funções *naked* e `naked_asm!` ([§35](rust-basico.md#35-funções-naked-e-naked_asm)),
 > `global_asm!` e símbolos externos ([§36](rust-basico.md#36-global_asm-e-símbolos-externos)),
 > convenções de chamada `extern "..."` ([§37](rust-basico.md#37-convenções-de-chamada-extern-sysv64))
+>
+> **Código deste capítulo:** [estado no fim do doc 10](https://github.com/moises-dev-git/siliconOS/tree/doc-10) · [o que mudou desde o doc 09](https://github.com/moises-dev-git/siliconOS/compare/doc-09...doc-10) · mapa em [Mudanças nos arquivos](#mudanças-nos-arquivos)
 
 ---
 
@@ -724,6 +726,202 @@ Este é o modo usuário mínimo, e vale ser honesto sobre o que ele não faz:
   recomenda começar pela interrupção de software, mais fácil de entender, e
   trocar depois que o comportamento estiver certo, que é o que fizemos.
 - **SMAP e SMEP** desligados.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do doc 09 (tag `doc-09`). O link de
+cada arquivo leva ao estado dele no fim deste capítulo (tag `doc-10`); todas as
+linhas que mudaram estão na [comparação entre as duas tags](https://github.com/moises-dev-git/siliconOS/compare/doc-09...doc-10).
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/usuario/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | **novo**: constantes, `Resultado`, `rodar`, `encerrar`, `falha_do_programa`, `tempo_esgotado`, `entrar_no_anel3`, `voltar_ao_kernel`, `Registros`, `entrada_syscall`, `tratar_syscall`, `faixa_do_programa`, `escrever` e os testes | — |
+| [`src/usuario/programas.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/programas.rs) | **novo**: o `global_asm!` com os 6 programas, os símbolos `unsafe extern "C"`, `Programa`, `PROGRAMAS`, `procurar` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/main.rs) | `mod usuario;` | junto dos outros `mod` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/main.rs) | `kprintln!` com o topo de `gdt::topo_pilha_anel0()` | depois do `kprintln!` da pilha IST1 |
+| [`src/gdt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/gdt.rs) | tirar o `#[allow(dead_code)]` de `USER_DATA` e `USER_CODE`; `static mut PILHA_ANEL0`; `rsp: [topo_anel0, 0, 0]` na TSS; `fn topo_pilha_anel0` | seletores; depois de `PILHA_DOUBLE_FAULT`; em `init`; antes de `topo_pilha_double_fault` |
+| [`src/idt.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/idt.rs) | `use crate::usuario;`; `INTERRUPT_GATE_DPL3`; `Entrada::para_usuario`; a entrada 0x80 em `init`; uma chamada a `usuario::falha_do_programa` no começo de `divisao`, `opcode_invalido`, `protecao_geral` e `page_fault` | veja os trechos abaixo |
+| [`src/interrupcoes/timer.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/interrupcoes/timer.rs) | o parâmetro do `tratador` passa a se chamar `quadro`; o teste `tempo_esgotado` + `eoi` + `encerrar` | logo depois do `fetch_add` |
+| [`src/memoria/paginacao.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/memoria/paginacao.rs) | o `else if` que liga USUARIO numa tabela que já existia | `mapear_em`, no laço que desce os níveis |
+| [`src/shell.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/shell.rs) | duas linhas em `COMANDOS` (`programas` e `rodar`) e as funções `programas` e `rodar_programa` | antes da linha do `reiniciar`; antes de `fn reiniciar` |
+
+### Os trechos que o texto não mostrou
+
+Para quem está reproduzindo sem abrir o GitHub, estas são as partes de
+`src/usuario/mod.rs` que as seções acima citaram sem mostrar por inteiro:
+
+```rust
+use core::arch::naked_asm;
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use spin::Mutex;
+
+use crate::gdt;
+use crate::idt::QuadroInterrupcao;
+use crate::interrupcoes::timer;
+use crate::memoria::paginacao::{self, flags};
+use crate::memoria::{quadros, TAMANHO_QUADRO};
+use crate::{cpu, kprint, kprintln};
+
+pub mod programas;
+
+pub const CODIGO_VIRT: u64 = 0x0000_2000_0000_0000;
+pub const PILHA_VIRT: u64 = 0x0000_2000_0010_0000;
+pub const VETOR_SYSCALL: u8 = 0x80;
+/// Um programa que passar disto sem devolver a CPU é encerrado pelo timer.
+pub const LIMITE_TIQUES: u64 = 2 * timer::FREQUENCIA_HZ;
+
+pub const SYS_SAIR: u64 = 0;
+pub const SYS_ESCREVER: u64 = 1;
+pub const SYS_TIQUES: u64 = 2;
+pub const ERRO_ENDERECO: u64 = -14i64 as u64;  // EFAULT: ponteiro inválido
+pub const ERRO_SYSCALL: u64 = -38i64 as u64;   // ENOSYS: chamada desconhecida
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Resultado {
+    Saiu(u64),
+    Falha { excecao: &'static str, rip: u64 },
+    TempoEsgotado,
+}
+
+static ATIVO: AtomicBool = AtomicBool::new(false);
+static INICIO: AtomicU64 = AtomicU64::new(0);
+static RESULTADO: Mutex<Option<Resultado>> = Mutex::new(None);
+/// RSP do kernel no momento em que entrou no anel 3 (lido por voltar_ao_kernel).
+static mut RSP_KERNEL: u64 = 0;
+```
+
+O miolo de `rodar` (entre preparar as páginas e entrar no anel 3), e a
+função que zera um quadro novo:
+
+```rust
+    unsafe {
+        let destino = paginacao::fisico_para_virtual(q_codigo.endereco()) as *mut u8;
+        core::ptr::copy_nonoverlapping(codigo.as_ptr(), destino, codigo.len());
+    }
+    ...
+    *RESULTADO.lock() = None;
+    INICIO.store(timer::tiques(), Ordering::Relaxed);
+    ATIVO.store(true, Ordering::Relaxed);
+    unsafe { entrar_no_anel3(CODIGO_VIRT, PILHA_VIRT + TAMANHO_QUADRO) };
+    ATIVO.store(false, Ordering::Relaxed);
+
+fn nova_pagina_zerada() -> quadros::Quadro {
+    let q = quadros::alocar().expect("sem quadros para o programa");
+    unsafe { core::ptr::write_bytes(paginacao::fisico_para_virtual(q.endereco()) as *mut u8, 0, 4096) };
+    q
+}
+```
+
+A pergunta que o tratador do timer faz:
+
+```rust
+pub fn tempo_esgotado(quadro: &QuadroInterrupcao) -> bool {
+    quadro.cs & 3 == 3
+        && ATIVO.load(Ordering::Relaxed)
+        && timer::tiques() - INICIO.load(Ordering::Relaxed) >= LIMITE_TIQUES
+}
+```
+
+E `escrever`, depois da validação:
+
+```rust
+fn escrever(ponteiro: u64, tamanho: u64) -> u64 {
+    if !faixa_do_programa(ponteiro, tamanho) {
+        kprintln!("[kernel] escrever(): ponteiro {:#x} fora da memoria do programa, recusado", ponteiro);
+        return ERRO_ENDERECO;
+    }
+    let bytes = unsafe { core::slice::from_raw_parts(ponteiro as *const u8, tamanho as usize) };
+    for &b in bytes {
+        kprint!("{}", if b.is_ascii() { b as char } else { '?' });
+    }
+    tamanho
+}
+```
+
+Em `src/usuario/programas.rs`, o tipo `Programa`:
+
+```rust
+pub struct Programa {
+    pub nome: &'static str,
+    pub descricao: &'static str,
+    inicio: *const u8,
+    fim: *const u8,
+}
+
+// Os ponteiros apontam para dados fixos do executável: seguros entre CPUs.
+unsafe impl Sync for Programa {}
+
+impl Programa {
+    /// Os bytes do código de máquina do programa.
+    pub fn codigo(&self) -> &'static [u8] {
+        unsafe { core::slice::from_raw_parts(self.inicio, self.fim as usize - self.inicio as usize) }
+    }
+}
+
+pub fn procurar(nome: &str) -> Option<&'static Programa> {
+    PROGRAMAS.iter().find(|p| p.nome == nome)
+}
+```
+
+No `src/idt.rs`, o método novo de `Entrada` e o começo do page fault (as
+mensagens viram variáveis, para servir ao programa e ao panic):
+
+```rust
+    /// A mesma entrada, mas chamável pelo anel 3 (chamadas de sistema).
+    fn para_usuario(mut self) -> Entrada {
+        self.tipo_atributos = INTERRUPT_GATE_DPL3;
+        self
+    }
+...
+extern "x86-interrupt" fn page_fault(quadro: QuadroInterrupcao, codigo: u64) {
+    let cr2: u64;
+    unsafe { asm!("mov {}, cr2", out(reg) cr2, options(nomem, nostack, preserves_flags)) };
+    let acao = if codigo & 0x10 != 0 { "executar" } else if codigo & 0x2 != 0 { "escrever em" } else { "ler" };
+    let causa = if codigo & 0x1 != 0 { "pagina presente, sem permissao" } else { "pagina nao mapeada" };
+    let modo = if codigo & 0x4 != 0 { "modo usuario" } else { "modo kernel" };
+    let reservado = if codigo & 0x8 != 0 { ", bit reservado na tabela" } else { "" };
+    usuario::falha_do_programa(&quadro, "PAGE FAULT",
+                               format_args!("ao {} {:#x} ({}, {}{})", acao, cr2, causa, modo, reservado));
+    panic!("EXCECAO #14 PAGE FAULT ao {} {:#x} ({}, {}{})\n{}", acao, cr2, causa, modo, reservado, quadro);
+}
+```
+
+Nos outros três tratadores a linha nova é igual, mudando o nome e o
+detalhe: `"DIVISAO POR ZERO"` com `format_args!("#DE")`, `"OPCODE INVALIDO"`
+com `format_args!("#UD")` e `"PROTECAO GERAL"` com
+`format_args!("#GP, codigo={:#x}", codigo)`.
+
+No `src/shell.rs`, os dois comandos:
+
+```rust
+    Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
+    Comando { nome: "rodar", uso: "rodar <programa>", descricao: "roda um programa no anel 3", funcao: rodar_programa },
+...
+fn programas(_: &[&str]) {
+    for p in &crate::usuario::programas::PROGRAMAS {
+        kprintln!("  {:<14}{} ({} bytes)", p.nome, p.descricao, p.codigo().len());
+    }
+}
+
+fn rodar_programa(argumentos: &[&str]) {
+    use crate::usuario::{self, Resultado};
+    let Some(programa) = argumentos.first().and_then(|n| usuario::programas::procurar(n)) else {
+        kprintln!("uso: rodar <programa>   (veja 'programas')");
+        return;
+    };
+    match usuario::rodar(programa) {
+        Resultado::Saiu(codigo) =>
+            kprintln!("'{}' terminou: codigo de saida {}", programa.nome, codigo as i64),
+        Resultado::Falha { excecao, rip } =>
+            kprintln!("'{}' encerrado pelo kernel: {} em {:#x}", programa.nome, excecao, rip),
+        Resultado::TempoEsgotado =>
+            kprintln!("'{}' encerrado pelo kernel: passou de {} s sem terminar",
+                      programa.nome, usuario::LIMITE_TIQUES / timer::FREQUENCIA_HZ),
+    }
+}
+```
 
 ---
 

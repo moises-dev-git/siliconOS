@@ -14,6 +14,8 @@
 > **Leia antes:** doc 05 (quadros) e doc 06 (paginação)
 > **Rust novo aqui:** `alloc`, `Box`, `Vec`, `String` ([§26](rust-basico.md#26-alloc-box-vec-e-string)),
 > `GlobalAlloc`, `Layout` e `#[global_allocator]` ([§27](rust-basico.md#27-globalalloc-layout-e-global_allocator))
+>
+> **Código deste capítulo:** [estado no fim do doc 07](https://github.com/moises-dev-git/siliconOS/tree/doc-07) · [o que mudou desde o doc 06](https://github.com/moises-dev-git/siliconOS/compare/doc-06...doc-07) · mapa em [Mudanças nos arquivos](#mudanças-nos-arquivos)
 
 ---
 
@@ -699,6 +701,24 @@ código foi restaurado.
 Os 13 testes dos capítulos anteriores (panic, as 6 exceções, quadros,
 liberação dupla de quadro, os 3 de paginação) passaram de novo com o heap
 ativo, e `teste-paginacao` também com `RAM=8G`.
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do doc 06 (tag `doc-06`). O link de
+cada arquivo leva ao estado dele no fim deste capítulo (tag `doc-07`); todas as
+linhas que mudaram estão na [comparação entre as duas tags](https://github.com/moises-dev-git/siliconOS/compare/doc-06...doc-07).
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/memoria/heap.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | **novo**: `NoLivre`, `Heap` (procurar, inserir, crescer, alocar, liberar), `HEAP`, `AlocadorLista` com `#[global_allocator]`, `init`, `estatisticas`, `contem` | — |
+| [`src/memoria/bump.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | **novo**: `Bump`, `AlocadorBump` (global só com a feature `teste-bump`), `init`, `estado` | — |
+| [`src/memoria/mod.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/mod.rs) | `#[allow(dead_code)] pub mod heap;` e `#[allow(dead_code)] pub mod bump;` | junto dos outros `pub mod` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | `extern crate alloc;` | topo, depois dos `#![...]` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | em `kernel_main`: `memoria::heap::init(); demonstrar_heap(); testes_de_heap();` | depois de `testes_de_paginacao()` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | `fn demonstrar_heap`, `fn testes_de_heap` | fim do arquivo |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-07/Cargo.toml) | `license = "MIT"`; `teste-heap`, `teste-heap-liberacao-dupla`, `teste-heap-esgotar`, `teste-heap-executar`, `teste-bump` | `[package]` e `[features]` |
 
 ---
 

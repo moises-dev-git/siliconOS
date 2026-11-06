@@ -10,6 +10,8 @@
 > **Rust novo aqui:** `-> !` ([§3](rust-basico.md#3-funções-e-o-tipo--nunca-retorna)),
 > atributos ([§13](rust-basico.md#13-atributos--e-)),
 > features e `#[cfg]` ([§12](rust-basico.md#12-módulos-crates-cargo-e-features))
+>
+> **Código deste capítulo:** os docs 00 a 06 estão num único commit: [estado no fim do doc 06](https://github.com/moises-dev-git/siliconOS/tree/doc-06). O que este capítulo acrescenta está em [Mudanças nos arquivos](#mudanças-nos-arquivos).
 
 ---
 
@@ -259,6 +261,21 @@ são instrução ou dividir por zero em assembly. Esses geram **exceções da
 CPU**, que **não passam pelo Rust** e não chamam o panic handler. Para
 tratá-las precisamos da **IDT** (doc 04), que por sua vez depende da **GDT**
 (doc 03).
+
+---
+
+## Mudanças nos arquivos
+
+O que este capítulo acrescenta ao código do anterior. Os docs 00 a 06 estão
+no primeiro commit do repositório: o link de cada arquivo leva ao código
+**no fim do doc 06**, que pode já ter o que os capítulos seguintes acrescentam.
+
+| Arquivo | O que muda | Onde |
+|---|---|---|
+| [`src/panic.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | **novo**: `#[panic_handler]`, `EM_PANIC`, `escrever_detalhes`, `parar` | — |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | `mod panic;` | junto dos outros `mod` |
+| [`src/main.rs`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | bloco `#[cfg(feature = "teste-panic")]` que indexa um array fora dos limites | fim de `kernel_main`, antes do `loop` |
+| [`Cargo.toml`](https://github.com/moises-dev-git/siliconOS/blob/doc-06/Cargo.toml) | `[features]` com `teste-panic = []` | fim do arquivo |
 
 ---
 
