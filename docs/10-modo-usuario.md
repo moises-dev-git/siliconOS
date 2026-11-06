@@ -146,7 +146,9 @@ tabelas intermediárias que **criava**. Faltava o caso de uma tabela que já
 existia, criada antes para o kernel:
 
 ```rust
-// src/memoria/paginacao.rs
+// src/memoria/paginacao.rs, em mapear_em, no laço que desce os níveis
+} else if e.grande() {
+    return Err(ErroMapeamento::JaMapeado);
 } else if bits & USUARIO != 0 && e.0 & USUARIO == 0 {
     // A tabela já existia, criada para o kernel. Para o anel 3 chegar
     // à página, TODOS os níveis precisam do bit USUARIO (doc 10).
@@ -216,6 +218,12 @@ Duas regras para esse código:
    à instrução atual", que continua certo depois de copiado.
 2. **Nada de chamar o kernel.** O programa não pode chamar `kprintln!`: a
    página do kernel nem está acessível. A única saída é `int 0x80`.
+3. **Rótulos numéricos a partir de `2:`.** Rótulos feitos só de `0` e `1`
+   (`1:`, `1b`) podem ser confundidos com números binários pelo montador do
+   LLVM. Num `asm!` dentro de função, o Rust os recusa (o lint
+   `binary_asm_labels`, erro por padrão); no `global_asm!` ele não reclama
+   (num teste, `1: jmp 1b` saiu certo), mas o projeto usa `2:`, `3:`,
+   `4:`... nos dois, por segurança.
 
 ### 4.1 Um bug de verdade: `offset`
 
@@ -226,6 +234,9 @@ silicon> rodar ola
 [kernel] PAGE FAULT no programa (RIP=0x200000000007): ao ler 0x34 (pagina nao mapeada, modo usuario)
 'ola' encerrado pelo kernel: PAGE FAULT em 0x200000000007
 ```
+
+(Nessa primeira versão a mensagem ainda não mostrava o CS; ele entrou
+depois, seção 7.1.)
 
 O endereço `0x34` é 52, exatamente o tamanho da mensagem. Na sintaxe Intel,
 `mov esi, NOME` com um símbolo quer dizer "**ler a memória** no endereço
@@ -238,9 +249,9 @@ programa virou uma mensagem, não um *kernel panic*.
 
 ```
 silicon> programas
-  ola           escreve uma mensagem e sai com codigo 42 (82 bytes)
+  ola           escreve uma mensagem e sai com codigo 42 (80 bytes)
   relogio       espera 1 s perguntando os tiques ao kernel (32 bytes)
-  ponteiro      passa um endereco do kernel para escrever() (91 bytes)
+  ponteiro      passa um endereco do kernel para escrever() (89 bytes)
   invasor       tenta ler a memoria do kernel (19 bytes)
   privilegiado  tenta executar cli (7 bytes)
   laco          laco infinito (o timer o encerra em 2 s) (2 bytes)
@@ -304,7 +315,9 @@ unsafe extern "sysv64" fn entrar_no_anel3(rip: u64, rsp: u64) -> u64 {
         "push rdi",
         // Não deixar valores do kernel nos registradores para o programa ver.
         "xor eax, eax", "xor ebx, ebx", "xor ecx, ecx", "xor edx, edx",
-        ...
+        "xor esi, esi", "xor edi, edi", "xor ebp, ebp",
+        "xor r8d, r8d", "xor r9d, r9d", "xor r10d, r10d", "xor r11d, r11d",
+        "xor r12d, r12d", "xor r13d, r13d", "xor r14d, r14d", "xor r15d, r15d",
         "iretq",
         rsp_kernel = sym RSP_KERNEL,
         ss = const gdt::USER_DATA as u64,
@@ -335,6 +348,9 @@ O `rodar` que chama tudo isso prepara as páginas, entra, e limpa na volta:
 
 ```rust
 pub fn rodar(programa: &programas::Programa) -> Resultado {
+    let codigo = programa.codigo();
+    assert!(codigo.len() <= TAMANHO_QUADRO as usize, "programa maior que uma pagina");
+
     // 1. Uma página de código (só leitura, executável) e uma de pilha
     //    (escrita, sem execução), as duas acessíveis pelo anel 3.
     let q_codigo = nova_pagina_zerada();
@@ -679,8 +695,12 @@ silicon> mem
 quadros: 20305 livres de 32768 (79 MiB livres)
 ```
 
-O número de quadros livres é o mesmo de antes de rodar os programas: as
-páginas de cada programa voltaram para o alocador. O kernel continuou
+Numa execução separada, `mem` mostrou 20308 quadros livres antes do primeiro
+programa, 20305 depois dele e 20305 depois do segundo. Os 3 quadros da
+primeira execução são as tabelas intermediárias (PDPT, PD e PT) criadas para
+a entrada 64 da PML4, que `desmapear` não libera (doc 06) e que os programas
+seguintes reaproveitam. Daí em diante a contagem não muda mais: as duas
+páginas de cada programa voltam para o alocador. O kernel continuou
 respondendo depois de cada falha.
 
 ### 8.2 `cargo test`
@@ -862,6 +882,128 @@ impl Programa {
 
 pub fn procurar(nome: &str) -> Option<&'static Programa> {
     PROGRAMAS.iter().find(|p| p.nome == nome)
+}
+```
+
+Os outros cinco programas, completos (o `ola` está na seção 4):
+
+```rust
+    // ---- invasor: tenta ler a memória do kernel ----
+    ".global programa_invasor_inicio",
+    ".global programa_invasor_fim",
+    "programa_invasor_inicio:",
+    "    movabs rax, 0xffff800000100000", // RAM física vista pelo kernel (doc 06)
+    "    mov rax, [rax]",
+    "    xor edi, edi",
+    "    xor eax, eax",
+    "    int 0x80",
+    "programa_invasor_fim:",
+
+    // ---- privilegiado: tenta desligar as interrupções ----
+    ".global programa_privilegiado_inicio",
+    ".global programa_privilegiado_fim",
+    "programa_privilegiado_inicio:",
+    "    cli",
+    "    xor edi, edi",
+    "    xor eax, eax",
+    "    int 0x80",
+    "programa_privilegiado_fim:",
+
+    // ---- ponteiro: pede ao kernel para escrever a partir de um endereço do kernel ----
+    ".global programa_ponteiro_inicio",
+    ".global programa_ponteiro_fim",
+    "programa_ponteiro_inicio:",
+    "    movabs rdi, 0xffff900000000000", // o heap do kernel (doc 07)
+    "    mov esi, 16",
+    "    mov eax, 1",
+    "    int 0x80",
+    "    test rax, rax",             // negativo = o kernel recusou
+    "    jns 4f",
+    "    lea rdi, [rip + ponteiro_msg]",
+    "    mov esi, offset PONTEIRO_TAM",
+    "    mov eax, 1",
+    "    int 0x80",
+    "    mov edi, 1",
+    "    xor eax, eax",
+    "    int 0x80",
+    "4:  xor edi, edi",
+    "    xor eax, eax",
+    "    int 0x80",
+    "ponteiro_msg: .ascii \"o kernel recusou o ponteiro\\n\"",
+    ".set PONTEIRO_TAM, . - ponteiro_msg",
+    "programa_ponteiro_fim:",
+
+    // ---- laco: nunca devolve a CPU ----
+    ".global programa_laco_inicio",
+    ".global programa_laco_fim",
+    "programa_laco_inicio:",
+    "2:  jmp 2b",
+    "programa_laco_fim:",
+
+    // ---- relogio: espera 1 s (100 tiques) perguntando ao kernel, e sai ----
+    ".global programa_relogio_inicio",
+    ".global programa_relogio_fim",
+    "programa_relogio_inicio:",
+    "    mov eax, 2",               // tiques()
+    "    int 0x80",
+    "    lea rbx, [rax + 100]",     // tique de chegada
+    "2:  mov eax, 2",
+    "    int 0x80",
+    "    cmp rax, rbx",
+    "    jb 2b",
+    "    mov edi, 100",             // código de saída fixo: 100 tiques esperados
+    "    xor eax, eax",
+    "    int 0x80",
+    "programa_relogio_fim:",
+
+    ".text",
+);
+```
+
+O `global_asm!` termina com `".text"` para devolver o montador à seção de
+código, e os símbolos de todos os programas são declarados no mesmo bloco
+`unsafe extern "C"` mostrado na seção 4.2.
+
+E dois dos testes, para mostrar a forma (os outros seis seguem o mesmo
+padrão):
+
+```rust
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    fn rodar_por_nome(nome: &str) -> Resultado {
+        rodar(programas::procurar(nome).unwrap())
+    }
+
+    #[test_case]
+    fn invasor_encerrado_por_page_fault() {
+        assert!(matches!(rodar_por_nome("invasor"), Resultado::Falha { excecao: "PAGE FAULT", .. }));
+    }
+
+    #[test_case]
+    fn nada_fica_mapeado_nem_vaza() {
+        // A primeira execução cria as tabelas intermediárias da entrada 64
+        // da PML4 (PDPT, PD e PT: 3 quadros), que `desmapear` não libera
+        // (doc 06). Rodar uma vez antes torna o teste independente da ordem.
+        rodar_por_nome("ola");
+        let livres = quadros::livres();
+        rodar_por_nome("ola");
+        assert!(paginacao::traduzir(CODIGO_VIRT).is_none());
+        assert!(paginacao::traduzir(PILHA_VIRT).is_none());
+        assert_eq!(quadros::livres(), livres);
+    }
+}
+```
+
+No `src/gdt.rs`, a função que o `main.rs` usa para mostrar o topo da pilha
+(copia o array para fora da `Tss`, que é `packed`, como em
+`topo_pilha_double_fault`):
+
+```rust
+/// Topo da pilha usada ao vir do anel 3 (TSS.rsp[0]).
+pub fn topo_pilha_anel0() -> u64 {
+    TSS.get().map(|t| { let rsp = t.rsp; rsp[0] }).unwrap_or(0)
 }
 ```
 
