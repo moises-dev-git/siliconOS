@@ -1,0 +1,15 @@
+[book]
+title = "SiliconOS: um sistema operacional em Rust"
+authors = ["Moisés"]
+description = "Diário de construção de um sistema operacional x86-64 em Rust que liga direto pelo UEFI."
+language = "pt-BR"
+src = "../docs"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+no-section-label = true
+additional-js = ["giscus.js"]

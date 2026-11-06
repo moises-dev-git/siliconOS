@@ -1,0 +1,573 @@
+# Rust para quem já programa (só o que o SiliconOS usa)
+
+Este guia não ensina Rust inteiro. Ele explica **apenas os recursos que
+aparecem no código do SiliconOS**, comparando com linguagens que você já
+conhece (Java, Kotlin, JavaScript/TypeScript, Python). Os capítulos remetem
+para cá sempre que um recurso aparece pela primeira vez.
+
+Se algo daqui parecer abstrato, pule e volte quando o capítulo pedir.
+
+---
+
+## 1. Tipos numéricos: o tamanho é explícito
+
+Em Java você tem `int` (32 bits) e `long` (64 bits). Em Python, inteiros não
+têm tamanho. Em Rust, **todo inteiro diz quantos bits tem e se tem sinal**:
+
+| Rust | Significado | Equivalente aproximado |
+|---|---|---|
+| `u8` | sem sinal, 8 bits (0 a 255) | `byte` sem sinal |
+| `u16` | sem sinal, 16 bits | `char` do Java (numérico) |
+| `u32` | sem sinal, 32 bits | `int` sem sinal |
+| `u64` | sem sinal, 64 bits | `long` sem sinal |
+| `i32`, `i64` | com sinal | `int`, `long` |
+| `usize` | sem sinal, do tamanho de um ponteiro (64 bits aqui) | usado para índices e tamanhos |
+
+Num kernel isso é essencial: o hardware exige campos de tamanho exato
+("este campo tem 16 bits"), então os tipos mapeiam um para um com o
+manual da Intel.
+
+Números podem ter `_` para facilitar a leitura e prefixos de base:
+
+```rust
+0x00FF_FFFF        // hexadecimal (o _ é só visual)
+0b0000_1100        // binário
+5 * 4096           // expressões normais
+```
+
+**Conversões são sempre explícitas**, com `as`:
+
+```rust
+let x: u64 = 300;
+let y = x as u16;   // como um cast em Java: (short) x
+let z = x as u8;    // 300 não cabe em 8 bits: vira 44 (descarta os bits altos)
+```
+
+Não existe conversão automática entre `u32` e `u64`, como existe de `int`
+para `long` em Java. Isso parece chato no começo, mas evita bugs sutis de
+truncamento.
+
+---
+
+## 2. Variáveis: imutáveis por padrão
+
+```rust
+let a = 5;          // imutável: como `val` do Kotlin ou `final` do Java
+let mut b = 5;      // mutável: como `var` do Kotlin
+b += 1;             // ok
+// a += 1;          // ERRO de compilação
+```
+
+O tipo geralmente é inferido, como em Kotlin e TypeScript. Quando
+precisa, ele vai depois do nome: `let x: u64 = 0;`.
+
+---
+
+## 3. Funções e o tipo `!` ("nunca retorna")
+
+```rust
+fn soma(a: u32, b: u32) -> u32 {
+    a + b           // a última expressão SEM ponto e vírgula é o retorno
+}
+```
+
+Como em Kotlin, quase tudo é expressão: um bloco `{ ... }` "vale" o valor
+da sua última linha.
+
+O SiliconOS usa muito um tipo especial: **`!`**, chamado *never*.
+
+```rust
+fn kernel_main(...) -> ! {
+    ...
+    loop { ... }    // loop infinito: nunca sai
+}
+```
+
+`-> !` significa **"esta função nunca retorna"**. Não é `void` (que
+retorna sem valor); é uma promessa verificada pelo compilador de que a
+função termina num loop infinito, para a máquina ou chama outra função
+`-> !`. Num kernel isso aparece o tempo todo: não existe "para onde
+voltar" depois que o kernel começa.
+
+---
+
+## 4. Structs e `impl`: classes sem herança
+
+Rust não tem classes. Tem **structs** (dados) e blocos **`impl`** (métodos
+para esses dados):
+
+```rust
+pub struct Console {        // como uma classe Java só com campos
+    col: usize,
+    row: usize,
+    pub cor: u32,           // pub = público; sem pub = privado ao módulo
+}
+
+impl Console {
+    pub fn new(...) -> Self { ... }        // "construtor" é só convenção de nome
+    fn cols(&self) -> usize { ... }        // método que só lê o objeto
+    pub fn write_byte(&mut self, b: u8) { ... }  // método que altera o objeto
+}
+```
+
+- **`Self`** = o próprio tipo (aqui, `Console`).
+- **`&self`** = como o `this` do Java, mas somente leitura.
+- **`&mut self`** = `this` com permissão de alterar campos.
+- Uma função dentro de `impl` sem `self` é como um método `static`:
+  chamada com `Console::new(...)`.
+
+---
+
+## 5. Traits: interfaces
+
+Uma **trait** é como uma `interface` do Java/Kotlin. O SiliconOS implementa a
+trait da biblioteca padrão `core::fmt::Write`, que exige um único método:
+
+```rust
+impl fmt::Write for Serial {           // "Serial implements Write"
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for b in s.bytes() { ... }
+        Ok(())
+    }
+}
+```
+
+Assim como interfaces Java podem ter métodos `default`, a trait `Write`
+traz de graça o método `write_fmt`, que formata texto (`"{} + {}"`) e
+chama o nosso `write_str`. **Implementamos 1 método e ganhamos a
+formatação inteira.** É por isso que `writeln!(Serial, "x = {}", x)`
+funciona.
+
+`impl Trait` em parâmetro significa "qualquer tipo que implemente esta
+trait", como um genérico com restrição (`<T extends MemoryMap>` em Java):
+
+```rust
+fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! { ... }
+```
+
+---
+
+## 6. `Option` e `Result`: sem `null` e sem exceções
+
+Rust **não tem `null`** nem exceções (`try/catch`). No lugar:
+
+- **`Option<T>`** é `Some(valor)` ou `None`. É o `Optional<T>` do Java ou
+  o `T?` do Kotlin.
+- **`Result<T, E>`** é `Ok(valor)` ou `Err(erro)`. É um "retorno que pode
+  ser erro", que você é obrigado a examinar.
+
+```rust
+static CONSOLE: Mutex<Option<Console>> = ...;   // pode não existir ainda
+
+if let Some(con) = CONSOLE.lock().as_mut() {    // "se existir, chame de con"
+    con.write_fmt(args);
+}
+```
+
+`if let Some(x) = valor` é como `valor?.let { x -> ... }` do Kotlin.
+
+**`.unwrap()`** significa "eu garanto que é `Some`/`Ok`; se não for,
+aborte". Se falhar, gera um **panic** (capítulo 02). Usamos `unwrap()` na
+fase de boot, em que não há o que fazer se o firmware falhar.
+
+`let _ = algo();` significa "ignoro o resultado de propósito". O
+compilador avisa se você ignorar um `Result` sem dizer nada.
+
+---
+
+## 7. `match`: um `switch` que obriga a cobrir tudo
+
+```rust
+let origem = match (codigo >> 1) & 0b11 {
+    0b00 => "GDT",
+    0b10 => "LDT",
+    _    => "IDT",       // _ = "qualquer outro valor" (o default)
+};
+```
+
+Parecido com o `when` do Kotlin. O `match` é uma expressão (devolve um
+valor), e o compilador **exige** que todos os casos possíveis sejam
+cobertos.
+
+---
+
+## 8. Referências e o "borrow checker" (versão curtíssima)
+
+Em Java, objetos são sempre acessados por referência e o coletor de lixo
+cuida da memória. Rust **não tem coletor de lixo**. Em vez dele, o
+compilador acompanha quem é "dono" de cada valor e quem o pegou
+emprestado:
+
+- `&x`: empréstimo **somente leitura** (pode haver vários ao mesmo tempo);
+- `&mut x`: empréstimo **com escrita** (só um por vez, e nenhum de
+  leitura junto).
+
+Essa regra ("ou muitos leitores, ou um escritor") é verificada **em tempo
+de compilação** e elimina uma classe inteira de bugs (dois trechos
+alterando o mesmo dado ao mesmo tempo). É por isso que o SiliconOS usa um
+`Mutex` para a variável global do console (seção 11).
+
+Quando um valor sai de escopo, ele é destruído automaticamente (o `drop`).
+É como o `try-with-resources` do Java, só que para tudo. O SiliconOS depende
+disso, por exemplo, para liberar o lock do console sozinho.
+
+---
+
+## 9. Ponteiros crus e `unsafe`
+
+Referências (`&T`) são sempre válidas: o compilador garante. Mas um
+kernel precisa fazer coisas que o compilador **não tem como verificar**,
+como "escreva no endereço `0x80000000`, que eu sei que é a tela". Para
+isso existem os **ponteiros crus**:
+
+```rust
+*mut u32     // ponteiro para u32, com escrita (como `uint32_t*` em C)
+*const u64   // ponteiro somente leitura
+```
+
+Ponteiros crus podem ser criados livremente, mas **só podem ser usados
+dentro de um bloco `unsafe`**:
+
+```rust
+unsafe {
+    self.fb.base.add(y * self.fb.stride + x).write_volatile(cor);
+}
+```
+
+`unsafe` **não desliga** as verificações do Rust. Ele libera apenas
+algumas operações extras (usar ponteiro cru, chamar função `unsafe`,
+executar assembly, mexer em `static mut`) e significa: **"compilador, aqui
+quem garante a correção sou eu"**. A boa prática, seguida no SiliconOS, é
+manter os blocos `unsafe` pequenos e comentados, e expor funções seguras
+por cima. Exemplo: `outb` é `unsafe`, mas `Serial::write_byte` não é, então
+quem usa a serial não precisa se preocupar.
+
+Uma **`unsafe fn`** é uma função que só pode ser chamada dentro de
+`unsafe { }`, porque quem chama precisa garantir alguma condição.
+
+---
+
+## 10. `static` e `const`
+
+```rust
+const ESCALA: usize = 2;              // constante: substituída no código, como #define
+static CONSOLE: Mutex<...> = ...;     // variável global: um único endereço na memória
+static mut PILHA: [u8; 20480] = ...;  // global MUTÁVEL: todo uso exige unsafe
+```
+
+Em Java, `static` é um campo da classe. Em Rust, `static` é uma
+**variável global com endereço fixo** que vive o programa inteiro. Isso
+importa para a CPU, que guarda **endereços** de tabelas (GDT, IDT): elas
+precisam ficar no mesmo lugar para sempre.
+
+`static mut` é perigoso, porque qualquer parte do código poderia alterá-la
+ao mesmo tempo. Por isso o Rust exige `unsafe` em todo acesso e
+recomenda envolver globais num `Mutex` ou `Once`.
+
+**`'static`** (com apóstrofo) é um *tempo de vida* que significa "válido
+até o fim do programa". `&'static T` é uma referência que nunca fica
+inválida.
+
+---
+
+## 11. `Mutex` e `Once` (da crate `spin`)
+
+- **`Mutex<T>`** protege um dado compartilhado, como o `synchronized` do
+  Java. `CONSOLE.lock()` devolve um "guarda"; enquanto ele existir, ninguém
+  mais pega o lock. Quando o guarda sai de escopo, o lock é liberado
+  sozinho (seção 8).
+  - O `Mutex` da biblioteca padrão põe a thread para *dormir* pedindo ao
+    sistema operacional, mas **nós somos o sistema operacional**. A crate
+    `spin` oferece um *spinlock*: quem quer o lock fica em loop tentando
+    até conseguir.
+- **`Once<T>`** guarda um valor que é calculado **uma única vez**, na
+  primeira chamada de `call_once`, como um `lazy` do Kotlin ou um
+  singleton. Devolve `&'static T`.
+
+---
+
+## 12. Módulos, crates, Cargo e features
+
+| Rust | Analogia |
+|---|---|
+| **crate** | um pacote/biblioteca (como um `.jar` ou um pacote npm) |
+| **Cargo** | o gerenciador de build e dependências (Maven/Gradle/npm juntos) |
+| `Cargo.toml` | o `pom.xml`/`package.json` |
+| `mod serial;` | "existe um módulo no arquivo `serial.rs`" (o Rust não descobre arquivos sozinho) |
+| `use spin::Mutex;` | `import` |
+| `crate::gdt` | caminho a partir da raiz do nosso projeto |
+| `pub` | `public`; sem `pub` é privado ao módulo |
+
+**Features** são opções de compilação declaradas no `Cargo.toml`:
+
+```toml
+[features]
+teste-pagefault = []
+```
+
+No código, `#[cfg(feature = "teste-pagefault")]` faz o bloco seguinte
+**só existir** quando a feature é ligada (`cargo build --features
+teste-pagefault`). É o `#ifdef` do C. O código de teste nem entra no
+binário normal.
+
+---
+
+## 13. Atributos: `#[...]` e `#![...]`
+
+São como as *annotations* do Java (`@Override`):
+
+| Atributo | Efeito |
+|---|---|
+| `#![no_std]` | (vale para o crate todo, por causa do `!`) não use a biblioteca padrão |
+| `#![no_main]` | não use o `main` padrão |
+| `#![feature(...)]` | ligue um recurso experimental (só no Rust *nightly*) |
+| `#[entry]` | (da crate `uefi`) esta função é o ponto de entrada UEFI |
+| `#[panic_handler]` | esta função trata os panics |
+| `#[repr(C)]` | organize os campos na memória exatamente na ordem escrita, como em C |
+| `#[repr(C, packed(2))]` | idem, e sem espaços de alinhamento (*padding*) entre campos |
+| `#[repr(align(16))]` | o início deste tipo fica num endereço múltiplo de 16 |
+| `#[repr(transparent)]` | uma struct com um único campo tem exatamente a mesma representação na memória que esse campo |
+| `#[derive(Clone, Copy)]` | gere automaticamente a cópia do valor |
+| `#[allow(dead_code)]` | não avise que isto não está sendo usado |
+
+O `#[repr(...)]` é crucial num kernel. Sem ele, o compilador Rust pode
+**reordenar os campos** de uma struct para economizar memória. Quando a
+struct descreve algo que a **CPU** vai ler (uma entrada da IDT, a TSS), a
+ordem e o tamanho precisam bater bit a bit com o manual.
+
+---
+
+## 14. Macros: o `!` no fim do nome
+
+`println!`, `panic!`, `writeln!`, `format_args!`, `asm!`: o `!` indica
+uma **macro**, não uma função. Macros são expandidas em código em tempo de
+compilação. É assim que `println!("{} {}", a, b)` aceita qualquer número de
+argumentos e verifica o texto de formatação durante a compilação.
+
+O SiliconOS define suas próprias macros (`kprintln!`, `kprint!`) com
+`macro_rules!`. Não é preciso entender a sintaxe interna delas: basta saber
+que `kprintln!("x = {}", x)` funciona como o `println!` normal.
+
+---
+
+## 15. `asm!`: assembly dentro do Rust
+
+```rust
+core::arch::asm!("out dx, al", in("dx") port, in("al") value);
+```
+
+- O texto entre aspas é a instrução de assembly x86 (sintaxe Intel:
+  destino primeiro).
+- `in("dx") port` significa "antes de executar, coloque a variável `port` no
+  registrador DX".
+- `out("al") valor` significa "depois de executar, copie o registrador AL para
+  `valor`".
+- `in(reg) x` significa "coloque `x` em qualquer registrador livre", e o
+  `{}` no texto vira o nome do registrador escolhido.
+- `options(nomem, nostack, ...)` são promessas ao otimizador ("esta
+  instrução não mexe na memória nem na pilha"), que permitem gerar código
+  melhor.
+
+Sempre exige `unsafe`.
+
+---
+
+## 16. Closures
+
+```rust
+TSS.call_once(|| { ... })
+```
+
+`|| { ... }` é uma função anônima sem parâmetros, como uma lambda do Java
+(`() -> { ... }`) ou uma arrow function do JS (`() => { ... }`). Com
+parâmetros: `|x, y| x + y`.
+
+---
+
+## 17. `no_std`, `core` e `alloc`
+
+| Biblioteca | O que tem | Depende de SO? |
+|---|---|---|
+| `core` | tipos, `Option`, `Result`, iteradores, formatação, atômicos | **não** |
+| `alloc` | `Box`, `Vec`, `String` (precisa de alguém que forneça memória) | não, mas exige um alocador |
+| `std` | arquivos, rede, threads, `println!`... | **sim** |
+
+O SiliconOS usa só `core` (`#![no_std]`). Quando escrevermos um alocador de
+memória (capítulo 8 do livro), ganharemos também `alloc` e poderemos usar
+`Vec` e `String` dentro do kernel.
+
+---
+
+## 18. Rust nightly
+
+O Rust tem três canais: *stable*, *beta* e *nightly*. O nightly permite
+recursos experimentais ligados com `#![feature(...)]`. O SiliconOS usa um
+deles: `abi_x86_interrupt` (capítulo 04), que permite escrever tratadores
+de interrupção em Rust puro.
+
+---
+
+## 19. `enum` simples
+
+```rust
+pub enum Tipo { Livre, BootServices, Kernel, Runtime, Acpi, Mmio, Reservada }
+```
+
+Como um `enum` do Java ou do Kotlin: um tipo que só pode assumir um dos
+valores listados. Usa-se com o nome do tipo na frente (`Tipo::Livre`) e
+quase sempre com `match`, que obriga a tratar todos os valores
+([§7](#7-match-um-switch-que-obriga-a-cobrir-tudo)).
+
+Os enums de Rust também podem carregar dados em cada variante (é assim que
+`Option` e `Result` são feitos: `Some(valor)`, `Ok(valor)`), mas o SiliconOS
+ainda não precisou disso.
+
+Para comparar dois valores com `==`, o enum precisa de
+`#[derive(PartialEq, Eq)]`. Em Java, a comparação de enums funciona sem
+declarar nada; em Rust, toda capacidade é pedida explicitamente.
+
+`matches!(valor, A | B)` é um atalho para "o valor é A ou B?", que devolve
+um `bool`.
+
+---
+
+## 20. Iteradores em cadeia: `filter`, `map`, `fold`...
+
+```rust
+self.regioes()
+    .iter()                                  // percorre as regiões
+    .filter(|r| r.tipo == tipo)              // só as do tipo pedido
+    .fold((0, 0), |(n, q), r| (n + 1, q + r.quadros))   // acumula (contagem, soma)
+```
+
+É a mesma ideia dos `Stream`s do Java, das funções de coleção do Kotlin ou
+de `filter`/`map`/`reduce` do JavaScript. Os nomes:
+
+| Rust | Java Stream / JS |
+|---|---|
+| `.iter()` | `.stream()` |
+| `.filter(\|x\| ...)` | `.filter(x -> ...)` |
+| `.map(\|x\| ...)` | `.map(x -> ...)` |
+| `.find(\|x\| ...)` | `.filter(...).findFirst()` / `.find()` |
+| `.fold(inicial, \|acc, x\| ...)` | `.reduce(inicial, ...)` |
+| `.max()` | `.max()` |
+| `.count()` | `.count()` |
+| `.enumerate()` | (pares índice + valor) |
+
+Uma diferença importante: em Rust isso **não aloca memória** nem cria
+objetos intermediários. O compilador transforma a cadeia num laço comum,
+tão rápido quanto escrever o `for` à mão. Por isso pode ser usado dentro do
+kernel antes mesmo de existir um alocador.
+
+---
+
+## 21. Slices: um pedaço de um array
+
+```rust
+&self.regioes[..self.qtd]     // do início até qtd (exclusivo)
+&lista[..i]                   // os i primeiros
+```
+
+Um **slice** (`&[T]` ou `&mut [T]`) é uma "janela" sobre uma sequência de
+valores na memória: um ponteiro mais um tamanho. Não copia nada. É como o
+`subList` do Java ou uma `view` sobre um array. Funciona com a sintaxe de
+intervalo: `[a..b]` (de `a` até antes de `b`), `[..b]`, `[a..]`.
+
+Slices conhecem o próprio tamanho, então `slice[i]` verifica o limite (e dá
+panic se `i` for grande demais).
+
+`core::slice::from_raw_parts_mut(ponteiro, n)` cria um slice a partir de um
+endereço cru e de uma quantidade. É `unsafe`, porque o compilador não tem
+como saber se aquela memória existe. O SiliconOS usa isso para enxergar o
+bitmap do alocador como um array comum.
+
+Métodos úteis de slice usados no projeto: `.len()`, `.fill(valor)`,
+`.contains(&x)`, `.sort_unstable_by_key(|x| chave)`, `.iter()`,
+`.iter_mut()`.
+
+---
+
+## 22. *Newtype*: um tipo próprio para um número
+
+```rust
+pub struct Quadro(pub u64);       // uma "struct-tupla" com um único campo
+
+let q = Quadro(0x101000);
+q.0                               // acessa o campo (por posição, não por nome)
+```
+
+Embrulhar um número num tipo próprio faz o compilador **recusar misturas
+erradas**: uma função que pede `Quadro` não aceita um `u64` qualquer, nem um
+futuro `EnderecoVirtual`. Em Java, o equivalente seria criar uma classe só
+para isso, com custo de objeto. Em Rust, o custo é **zero**: na memória, um
+`Quadro` é só um `u64`.
+
+---
+
+## 23. `assert!` e `expect`: verificações que viram panic
+
+```rust
+assert!(condicao, "mensagem {}", valor);    // se a condição for falsa: panic com a mensagem
+assert_eq!(a, b);                           // se a != b: panic mostrando os dois valores
+opcao.expect("mensagem")                    // como unwrap(), mas com mensagem explicativa
+```
+
+São usados para **invariantes**: coisas que, se forem falsas, significam
+um bug. Diferente do Java, os `assert!` do Rust **ficam ligados também na
+versão final** (há `debug_assert!` para os que só valem em modo de
+depuração). Num kernel isso é uma vantagem: um estado impossível vira uma
+mensagem clara na hora, em vez de corrupção silenciosa mais tarde.
+
+`expect("...")` é preferível a `unwrap()` quando a falha é possível em
+teoria: a mensagem aparece no panic e diz **o que** estava faltando.
+
+---
+
+## 24. O operador `?`: propagar erros
+
+```rust
+let nova = nova_tabela().ok_or(ErroMapeamento::SemMemoria)?;
+```
+
+Lendo da esquerda para a direita:
+
+1. `nova_tabela()` devolve `Option<u64>` (`None` se a memória acabou);
+2. `.ok_or(erro)` converte para `Result`: `Some(x)` vira `Ok(x)`, `None` vira
+   `Err(erro)`;
+3. o **`?`** no fim: se for `Ok(x)`, a expressão vale `x` e o código segue; se
+   for `Err(e)`, **a função atual retorna `Err(e)` imediatamente**.
+
+É o equivalente a deixar uma exceção "subir" em Java, mas visível no código
+(o `?` marca exatamente onde a função pode sair mais cedo) e checado pelo
+compilador: só se pode usar `?` numa função que também devolve `Result` (ou
+`Option`).
+
+Sem o `?`, seria preciso escrever:
+
+```rust
+let nova = match nova_tabela() {
+    Some(x) => x,
+    None => return Err(ErroMapeamento::SemMemoria),
+};
+```
+
+---
+
+## 25. Atômicos: `AtomicU64`, `AtomicBool`
+
+```rust
+static DESLOCAMENTO_ATUAL: AtomicU64 = AtomicU64::new(0);
+
+DESLOCAMENTO_ATUAL.store(valor, Ordering::Relaxed);   // escrever
+let d = DESLOCAMENTO_ATUAL.load(Ordering::Relaxed);   // ler
+```
+
+Os tipos `Atomic*` são como os `AtomicLong`/`AtomicBoolean` do Java: valores
+que podem ser lidos e alterados com segurança mesmo por várias CPUs ao
+mesmo tempo, **sem lock**. São a forma mais simples de ter uma global
+mutável sem `unsafe` e sem `Mutex`, quando o dado é um único número.
+
+O parâmetro `Ordering` controla as garantias de ordem entre CPUs
+diferentes. `Relaxed` (a mais fraca) basta quando só importa o valor da
+própria variável; `SeqCst` (a mais forte, usada no panic handler) garante uma
+ordem global. Enquanto o SiliconOS rodar numa CPU só, a diferença não aparece.

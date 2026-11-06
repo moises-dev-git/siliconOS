@@ -1,0 +1,30 @@
+[package]
+name = "siliconos"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+font8x8 = { version = "0.3", default-features = false }
+spin = { version = "0.9", default-features = false, features = ["spin_mutex", "once"] }
+uefi = { version = "0.33.0", features = ["logger"] } # Versão atualizada compatível com no_std/uefi
+
+
+[features]
+# Provoca um panic de propósito para testar o tratador (docs/02-panic-handler.md)
+teste-panic = []
+# Provocam exceções da CPU de propósito (docs/04-idt-e-excecoes.md)
+teste-breakpoint = []
+teste-divisao = []
+teste-opcode = []
+teste-pagefault = []
+teste-gpf = []
+teste-doublefault = []
+# Testes do alocador de quadros (docs/05-memoria-fisica.md)
+teste-quadros = []
+teste-liberacao-dupla = []
+# Lista todas as regiões do mapa de memória no boot
+listar-regioes = []
+# Testes de paginação (docs/06-paginacao.md)
+teste-paginacao = []
+teste-desmapeado = []
+teste-nulo = []

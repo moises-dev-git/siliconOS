@@ -1,0 +1,16 @@
+# Saídas de compilação
+/target/
+/esp/EFI/BOOT/BOOTX64.efi
+/esp/NvVars
+serial.log
+
+# Site gerado (mdBook) e cache do wrangler
+/site/book/
+/site/.wrangler/
+
+# Notas locais
+CLAUDE.md
+
+# Backups locais
+/src/main (cópia).rs
+/main_etapa0_backup.rs
