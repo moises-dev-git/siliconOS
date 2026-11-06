@@ -285,6 +285,10 @@ mod testes {
 
     #[test_case]
     fn nada_fica_mapeado_nem_vaza() {
+        // A primeira execução cria as tabelas intermediárias da entrada 64
+        // da PML4 (PDPT, PD e PT: 3 quadros), que `desmapear` não libera
+        // (doc 06). Rodar uma vez antes torna o teste independente da ordem.
+        rodar_por_nome("ola");
         let livres = quadros::livres();
         rodar_por_nome("ola");
         assert!(paginacao::traduzir(CODIGO_VIRT).is_none());
