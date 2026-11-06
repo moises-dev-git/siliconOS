@@ -1,0 +1,17 @@
+[book]
+title = "SiliconOS: an operating system in Rust"
+authors = ["Moisés"]
+description = "Build log of an x86-64 operating system in Rust that boots straight from UEFI."
+language = "en"
+src = "../../docs-en"
+
+[build]
+# Built after the Portuguese book, into its /en/ subfolder.
+build-dir = "../book/en"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+no-section-label = true
+site-url = "/en/"
+additional-js = ["idioma.js", "giscus.js"]

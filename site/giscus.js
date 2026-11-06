@@ -6,6 +6,7 @@
 
   // A página 404 não recebe comentários.
   if (document.title.indexOf("Page not found") === 0) return;
+  if (document.title.indexOf("Página não encontrada") === 0) return;
 
   var main = document.querySelector("main");
   if (!main) return;
@@ -13,7 +14,11 @@
   // Identificador estável de cada página: o caminho sem ".html" e sem a barra
   // final. Assim "/03-gdt-e-tss.html" (local) e "/03-gdt-e-tss" (Cloudflare)
   // caem no mesmo tópico, e a página inicial vira "index".
+  // As versões em português (raiz) e em inglês (/en/) da mesma página
+  // compartilham o tópico: o prefixo "en/" é removido.
+  var emIngles = /^\/en(\/|$)/.test(location.pathname);
   var termo = location.pathname
+    .replace(/^\/en(\/|$)/, "/")
     .replace(/\.html$/, "")
     .replace(/\/index$/, "/")
     .replace(/^\/+|\/+$/g, "") || "index";
@@ -30,7 +35,11 @@
 
   var secao = document.createElement("section");
   secao.style.marginTop = "4rem";
-  secao.innerHTML = '<hr><h2 id="comentarios">Comentários</h2>';
+  secao.innerHTML = emIngles
+    ? '<hr><h2 id="comentarios">Comments</h2>' +
+      "<p><small>Comments are shared with the Portuguese version of this page.</small></p>"
+    : '<hr><h2 id="comentarios">Comentários</h2>' +
+      "<p><small>Os comentários são compartilhados com a versão em inglês desta página.</small></p>";
   main.appendChild(secao);
 
   var s = document.createElement("script");
@@ -49,7 +58,7 @@
     "data-emit-metadata": "0",
     "data-input-position": "top",
     "data-theme": temaGiscus(),
-    "data-lang": "pt",
+    "data-lang": emIngles ? "en" : "pt",
     "data-loading": "lazy"
   };
   for (var k in config) s.setAttribute(k, config[k]);

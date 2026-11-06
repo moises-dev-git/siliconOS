@@ -1,38 +1,50 @@
 # SiliconOS
 
-Um sistema operacional para PCs x86-64, escrito em **Rust**, que liga direto
-pelo firmware **UEFI**, sem bootloader de terceiros. É um projeto de
-aprendizado: as estruturas da CPU (GDT, TSS, IDT, tabelas de página) são
-montadas à mão, bit a bit, para mostrar o que as bibliotecas prontas escondem.
+**English** | [Português](README.pt-BR.md)
 
-📖 **Documentação didática (em português):** https://siliconos.pages.dev
-— cada etapa explicada para quem programa, mas nunca escreveu um SO nem
-programou em Rust. Os comentários de cada capítulo ficam nas
+An operating system for x86-64 PCs, written in **Rust**, that boots
+straight from the **UEFI** firmware, with no third-party bootloader. It is a
+learning project: the CPU structures (GDT, TSS, IDT, page tables) are built
+by hand, bit by bit, to show what ready-made libraries hide.
+
+📖 **Step-by-step documentation:** https://siliconos.pages.dev/en/ (English)
+· https://siliconos.pages.dev (Portuguese)
+— every stage explained for people who program, but have never written an
+OS or programmed in Rust. Each chapter's comments live in the
 [Discussions](https://github.com/moises-dev-git/siliconOS/discussions).
 
-## Estado
+> The source code (identifiers, comments and the kernel's messages) is in
+> Portuguese. The English documentation translates the comments in every
+> snippet it shows and explains the names it uses.
 
-| Etapa | Código | Doc |
+## Status
+
+| Stage | Code | Doc |
 |---|---|---|
-| Boot UEFI e saída dos serviços do firmware | `src/main.rs` | [00](docs/00-visao-geral.md) |
-| Porta serial, texto na tela, `kprintln!` | `src/serial.rs`, `src/console.rs` | [01](docs/01-saida-serial-e-video.md) |
-| Panic handler próprio | `src/panic.rs` | [02](docs/02-panic-handler.md) |
-| GDT e TSS | `src/gdt.rs` | [03](docs/03-gdt-e-tss.md) |
-| IDT e exceções da CPU | `src/idt.rs` | [04](docs/04-idt-e-excecoes.md) |
-| Mapa de memória e alocador de quadros | `src/memoria/` | [05](docs/05-memoria-fisica.md) |
-| Paginação | `src/memoria/paginacao.rs` | [06](docs/06-paginacao.md) |
-| Heap | — | em andamento |
+| UEFI boot and leaving the firmware's services | `src/main.rs` | [00](docs-en/00-visao-geral.md) |
+| Serial port, text on screen, `kprintln!` | `src/serial.rs`, `src/console.rs` | [01](docs-en/01-saida-serial-e-video.md) |
+| Custom panic handler | `src/panic.rs` | [02](docs-en/02-panic-handler.md) |
+| GDT and TSS | `src/gdt.rs` | [03](docs-en/03-gdt-e-tss.md) |
+| IDT and CPU exceptions | `src/idt.rs` | [04](docs-en/04-idt-e-excecoes.md) |
+| Memory map and frame allocator | `src/memoria/` | [05](docs-en/05-memoria-fisica.md) |
+| Paging | `src/memoria/paginacao.rs` | [06](docs-en/06-paginacao.md) |
+| Heap | — | in progress |
 
-## Rodar
+## Running
 
-Requer Rust nightly com o alvo `x86_64-unknown-uefi`, QEMU e OVMF
-(detalhes em [docs/README.md](docs/README.md#como-compilar-e-rodar)).
+Requires Rust nightly with the `x86_64-unknown-uefi` target, QEMU and OVMF
+(details in [docs-en/README.md](docs-en/README.md#how-to-build-and-run)).
 
 ```bash
-./run.sh                  # compila e abre no QEMU
-SEM_TELA=1 ./run.sh       # sem janela, mostra a saída serial
-./run.sh teste-pagefault  # versões de teste: veja docs/README.md
+./run.sh                  # builds and opens it in QEMU
+SEM_TELA=1 ./run.sh       # no window, shows the serial output
+./run.sh teste-pagefault  # test builds: see docs-en/README.md
 ```
 
-O site é gerado com [mdBook](https://rust-lang.github.io/mdBook/) a partir de
-`docs/` (configuração em `site/`).
+The site is generated with [mdBook](https://rust-lang.github.io/mdBook/)
+from `docs/` (Portuguese) and `docs-en/` (English); configuration in
+`site/`.
+
+## License
+
+[MIT](LICENSE).

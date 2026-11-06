@@ -12,4 +12,5 @@ build-dir = "book"
 default-theme = "light"
 preferred-dark-theme = "navy"
 no-section-label = true
-additional-js = ["giscus.js"]
+additional-js = ["idioma.js", "giscus.js"]
+site-url = "/"
