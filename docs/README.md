@@ -60,6 +60,7 @@ do livro e depois o documento correspondente.
 | [12: O escalonador](12-escalonador.md) | Processos, troca de contexto, pilha do kernel por processo, preempção pelo timer, `ps` e `&` | 11.4 | ✅ |
 | [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md) | Programas de usuário em Rust, script de ligação, formato tar, carregador de ELF | 11.4 | ✅ |
 | [14: syscall e sysret](14-syscall-sysret.md) | A porta rápida para o kernel: MSRs STAR/LSTAR/FMASK, troca de pilha manual, medição em ciclos | 11.4 | ✅ |
+| [15: Dormir e processos bloqueados](15-dormir-e-bloqueio.md) | Estado Bloqueado, processo ocioso, syscall `dormir`, o acordar perdido | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 | [Mapa do SiliconOS](mapa.md) | Diagramas do sistema | — | ✅ |
@@ -125,6 +126,7 @@ que o kernel o trata):
 | `./run.sh teste-print-interrupcao` | `kprint!` dentro do tratador do timer (funciona) | 08 |
 | `./run.sh teste-deadlock` | o mesmo sem a proteção do `kprintln!` (deve travar) | 08 |
 | `./run.sh teste-teclado` | mostra cada scancode recebido do teclado | 08 |
+| `./run.sh teste-acordar-perdido` | abre a janela entre conferir e bloquear: uma tecla digitada nela só aparece com a próxima | 15 |
 | `cargo test --target x86_64-unknown-uefi --features teste-que-falha` | inclui um `#[test_case]` que falha (o `cargo test` deve falhar) | 09 |
 
 Para mudar a memória da máquina emulada (padrão: 128 MiB), use `RAM`, por

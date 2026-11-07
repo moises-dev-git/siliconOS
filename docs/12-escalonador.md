@@ -1082,9 +1082,9 @@ Todas as funções que este capítulo acrescenta, em uma frase cada. As mais imp
 | `retirar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Tira um processo terminado da tabela (corrigindo o índice do atual) e devolve o processo e o resultado. |
 | `recolher` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Se o processo `pid` terminou, retira-o, libera pilha e espaço e devolve o resultado. |
 | `recolher_segundo_plano` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Libera todos os processos de segundo plano que já terminaram. |
-| `esperar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Cede a CPU até o processo `pid` terminar e devolve o resultado. |
+| `esperar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Cede a CPU até o processo `pid` terminar e devolve o resultado. (Desde o doc 15, bloqueado: fica fora do rodízio até o processo terminar.) |
 | `pid_atual` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | O pid de quem está rodando (a syscall `pid`). |
-| `ha_outros_prontos` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Há algum processo, além do atual, pronto para rodar? |
+| `ha_outros_prontos` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Há algum processo, além do atual, pronto para rodar? (Removida no doc 15: o shell passou a bloquear.) |
 | `listar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Pid, nome, estado e tiques de CPU de cada processo (comando `ps`). |
 | `Processo::topo_pilha` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Endereço do topo da pilha do kernel do processo (o valor de TSS.RSP0). |
 | `definir_rsp0` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/gdt.rs) | Escreve TSS.rsp[0] (pela `UnsafeCell`, com escrita não alinhada): a pilha usada na próxima interrupção vinda do anel 3. |

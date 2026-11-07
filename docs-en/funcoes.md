@@ -6,7 +6,7 @@ Every kernel function, grouped by the file it lives in and sorted alphabetically
 
 This page is **generated automatically** (`site/indice_funcoes.py`) from the "Functions in this chapter" table of every chapter, each time the site is published. When a function changed in a later chapter, the sentence says "(since doc NN ...)"; the current code is always in [`src/`](https://github.com/moises-dev-git/siliconOS/tree/main/src).
 
-272 functions and 54 tests (or test helpers), from 15 chapters.
+287 functions and 61 tests (or test helpers), from 16 chapters.
 
 ---
 
@@ -76,13 +76,21 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 
 | Function | What it does | Doc |
 |---|---|---|
+| `acordar` | Sets every process blocked for the given reason to `Pronto` and returns how many; can be called from a handler. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `acordar_em` | The same as `acordar`, for code that already holds the table's lock (`encerrar`). | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `bloquear_e_trocar` | Marks the current process as `Bloqueado(motivo)` and switches processes; returns when it is woken up and its turn comes. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `ceder` | With interrupts off, picks the next process and switches to it; returns when this one's turn comes again. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `criar` | Creates a process with a fabricated kernel stack (6 registers, return to `primeira_entrada`, an `iretq` frame) and puts it in the table as `Pronto`. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `dormir` | Blocks the current process for at least that many ticks, without using the CPU. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `encerrar` | Marks the current process `Terminado`, prints the result if it is a background one and yields never to return. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `escolher_proximo` | Round robin: finds the next `Pronto`, updates the states, switches TSS.RSP0 and CR3 and returns the two RSPs for `trocar`. | [12](12-escalonador.md#functions-in-this-chapter) |
-| `esperar` | Yields the CPU until process `pid` ends and returns the result. | [12](12-escalonador.md#functions-in-this-chapter) |
-| `ha_outros_prontos` | Is any process besides the current one ready to run? | [12](12-escalonador.md#functions-in-this-chapter) |
+| `esperar` | Yields the CPU until process `pid` ends and returns the result. (Since doc 15, blocked: out of the round robin until the process ends.) | [12](12-escalonador.md#functions-in-this-chapter) |
+| `esperar_ate` | Blocks the current process until the condition is true, checking it with interrupts off (no lost wakeup). | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `ha_outros_prontos` | Is any process besides the current one ready to run? (Removed in doc 15: the shell now blocks.) | [12](12-escalonador.md#functions-in-this-chapter) |
+| `ha_terminados_em_segundo_plano` | Is there a finished background process waiting to be reaped? (part of the shell's condition) | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `init` | Registers the code that is running (the kernel) as process 0. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `janela_do_acordar_perdido` | (only with `teste-acordar-perdido`) Turns interrupts on for 3 s between checking and blocking, to show the bug. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `laco_ocioso` | (naked) The idle process: `sti; hlt` forever; runs when nobody else can. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `listar` | Pid, name, state and CPU ticks of each process (the `ps` command). | [12](12-escalonador.md#functions-in-this-chapter) |
 | `pid_atual` | The pid of whoever is running (the `pid` syscall). | [12](12-escalonador.md#functions-in-this-chapter) |
 | `primeira_entrada` | (naked) Where a new process's first `trocar` "returns": zeroes the registers and does `iretq` into ring 3. | [12](12-escalonador.md#functions-in-this-chapter) |
@@ -90,6 +98,7 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `recolher` | If process `pid` has ended, removes it, frees stack and space and returns the result. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `recolher_segundo_plano` | Frees every background process that has already ended. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `retirar` | Removes a finished process from the table (fixing the current index) and returns the process and its result. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `terminou` | Has process `pid` finished (or does it not even exist)? The condition of `esperar`. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `tique` | Called by the timer: counts the CPU time of the program interrupted in ring 3, ends whoever went over the limit and yields. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `trocar` | (naked) The context switch: pushes 6 registers, saves RSP, loads the other process's RSP, pops and `ret`s. | [12](12-escalonador.md#functions-in-this-chapter) |
 
@@ -165,13 +174,14 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `digitar` | Test helper: runs a sequence of scancodes through the decoder and collects the characters. | [09](09-shell-e-testes.md#functions-in-this-chapter) |
 | `enviar_comando` | Waits for the 8042 input buffer to empty and writes a command to port 0x64. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `enviar_dado` | Waits for the input buffer to empty and writes a data byte to port 0x60. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
-| `esperar` | Sleeps with `hlt` if the queue is empty, using `cli; test; sti; hlt` so a key arriving in between is not lost. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
-| `fila_vazia` | Is the queue empty? (compares the read and write indices). | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
+| `esperar` | Sleeps with `hlt` if the queue is empty, using `cli; test; sti; hlt` so a key arriving in between is not lost. (Replaced in doc 15: the shell blocks with `escalonador::esperar_ate` and the handler wakes it up.) | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
+| `fila_vazia` | Is the queue empty? (compares the read and write indices). (Replaced in doc 15 by `tem_scancode`.) | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `init` | Discards stale bytes, reads the 8042 configuration, sets the IRQ 1 bit and writes it back. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `ler_dado` | Waits for the output buffer to fill and reads a byte from port 0x60. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `perdidos` | How many scancodes were dropped because the queue was full. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `proximo_scancode` | Takes the next scancode from the queue (the consumer side of the SPSC queue). | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 | `recebidos` | How many scancodes the handler has received. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
+| `tem_scancode` | Is there a scancode in the queue? Replaces `esperar` and `fila_vazia`. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `tratador` | Vector 0x31 handler: reads the scancode from port 0x60, queues it (or counts it as lost) and sends EOI. | [08](08-interrupcoes-de-hardware.md#functions-in-this-chapter) |
 
 ### [src/interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/interrupcoes/timer.rs)
@@ -380,6 +390,7 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | Function | What it does | Doc |
 |---|---|---|
 | `descrever` | Short text describing a program's result ("terminou: codigo de saida 42"...). | [12](12-escalonador.md#functions-in-this-chapter) |
+| `dormir` (syscall) | Syscall 4: sleeps `ms` milliseconds (rounded up to ticks); returns 0. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `encerrar` | Stores the result and jumps to `voltar_ao_kernel`; called from inside a handler, never returns. (Replaced in doc 12 by `escalonador::encerrar`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `entrada_syscall` | (naked) Vector 0x80 handler: pushes the registers into a `Registros`, calls `tratar_syscall` and returns with `iretq`. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `entrar_no_anel3` | (naked) Saves the kernel's registers and RSP, builds an interrupt frame by hand (the program's SS, RSP, RFLAGS, CS, RIP) and runs `iretq`. (Replaced in doc 12 by the fabricated stack of `escalonador::criar` + `primeira_entrada`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
@@ -388,6 +399,7 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `falha_do_programa` | Called by the exception handlers: if CS says ring 3, prints the fault and kills the program; otherwise returns and the handler panics. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `iniciar` | Prepares the program's address space (code and stack) and hands it to the scheduler; returns the pid. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `iniciar_elf` | Creates the space, loads the ELF, maps 4 stack pages at the end of the lower half and hands it to the scheduler with RSP = top − 8. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
+| `ms_para_tiques` | Milliseconds to ticks, rounding up and without overflowing. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `nova_pagina_zerada` | Allocates a frame and zeroes it (so the program does not see leftovers from the frame's previous user). | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `rodar` | Maps the program's code and stack with the USER bit, enters ring 3, and when it ends unmaps everything, frees the frames and returns the `Resultado`. (Since doc 11, in its own address space; since doc 12, it is `iniciar` + `escalonador::esperar`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `rodar_por_nome` | Test helper: looks up the program by name and runs it. | [10](10-modo-usuario.md#functions-in-this-chapter) |
@@ -433,6 +445,12 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 |---|---|---|
 | `main` (dados) | Checks that `.bss` came zeroed, writes to it, adds 1 to `.data`'s `CONTADOR` and returns the value (42). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 
+### [programas/src/bin/insone.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/insone.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `main` (insone) | The same as `soneca`, but with busy waiting. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+
 ### [programas/src/bin/medir.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/medir.rs)
 
 | Function | What it does | Doc |
@@ -455,6 +473,12 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `main` (primos) | Counts the primes below 10,000, shows the first 10 and returns the count (1229). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `primo` | Is `n` prime? (divisions up to the square root) | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 
+### [programas/src/bin/soneca.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/soneca.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `main` (soneca) | Wakes up 5 times, every 500 ms, sleeping in between. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+
 ### [programas/src/lib.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/lib.rs)
 
 | Function | What it does | Doc |
@@ -462,6 +486,7 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `_start` (macro `principal!`) | Entry point generated by the macro: calls the program's `main` and passes the result to `sair`. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `chamada` | Makes a system call through `syscall`, telling the compiler RCX and R11 change. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
 | `Console::write_str` | `fmt::Write`: each piece of formatted text becomes an `escrever` (the base of `print!`/`println!`). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
+| `dormir` (sos) | Calls the `dormir` syscall. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `escrever` | System call 1: writes bytes to the console and returns how many (or a negative error). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `panic` | The programs' panic handler: prints the message and exits with 101. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `pid` | System call 3: the process number. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
@@ -497,8 +522,14 @@ The `#[test_case]`s that run with `cargo test` (doc [09](09-shell-e-testes.md)),
 | `dois_contadores_ao_mesmo_tempo` | Test: two `contador`s together take under 300 ticks (one after the other would be 500). | [12](12-escalonador.md#functions-in-this-chapter) |
 | `dois_lacos_dividem_a_cpu` | Test: two `laco`s together take at least 390 wall-clock ticks, because each needs 200 CPU ticks. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `iniciar` (in the tests) | Helper: starts a built-in program by name, not in the background. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `insone_gasta_a_cpu_e_e_encerrado` | Test: `insone` never lets the CPU stop and is terminated for running out of time. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `o_kernel_dorme_e_a_cpu_fica_parada` | Test: `dormir(20)` takes 20 or 21 ticks, almost all with the idle process running. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `o_kernel_e_o_processo_zero` | Test: whoever runs the tests is process 0, "kernel", `Rodando`. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `o_ocioso_e_o_processo_um` | Test: process 1 is "ocioso" and is `Pronto`. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `processo_terminado_devolve_pilha_e_quadros` | Test: once reaped, the process is gone from the table and frames and heap are back to what they were. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `rodar_do_disco` | Helper: runs a program from the RAM disk and waits for the result. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `soneca_dorme_sem_gastar_cpu` | Test: while `soneca` exists, the CPU stays stopped at least 90% of the time. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `tiques_ociosos` | Helper: the idle process's ticks so far (time with the CPU stopped). | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 
 ### src/interrupcoes/teclado.rs
 
@@ -589,6 +620,7 @@ The `#[test_case]`s that run with `cargo test` (doc [09](09-shell-e-testes.md)),
 |---|---|---|
 | `invasor_encerrado_por_page_fault` | Test: `invasor` (reads kernel memory) ends with #PF. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `laco_encerrado_pelo_timer` | Test: `laco` (infinite loop) is killed by the timer. | [10](10-modo-usuario.md#functions-in-this-chapter) |
+| `milissegundos_viram_tiques_para_cima` | Test: 1 ms becomes 1 tick, 11 ms become 2, `u64::MAX` does not overflow. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `nada_fica_mapeado_nem_vaza` | Test: after a warm-up, running `ola` leaves the program's addresses unmapped and the free frame count unchanged. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `ola_sai_com_42` | Test: `ola` writes and exits with 42. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `ponteiro_do_kernel_recusado` | Test: `ponteiro` passes a kernel address, gets -14 and exits with 1. | [10](10-modo-usuario.md#functions-in-this-chapter) |

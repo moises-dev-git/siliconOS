@@ -139,6 +139,27 @@ CPU quando quer (doc 12).
 : Um processo que já terminou, mas continua na tabela até alguém ler o
 resultado e liberar a memória dele (doc 12).
 
+**Espera ocupada** (*busy waiting*)
+: Esperar perguntando sem parar ("já deu a hora?", "chegou tecla?"). O
+processo continua no rodízio e gasta a CPU inteira sem fazer nada útil
+(doc 15).
+
+**Bloqueado** (estado de um processo)
+: Esperando alguma coisa (um prazo, uma tecla, outro processo terminar),
+fora do rodízio. Volta a ser pronto quando alguém o **acorda**: quem fez a
+coisa acontecer (doc 15).
+
+**Processo ocioso** (*idle*)
+: O processo que roda quando nenhum outro pode: só faz `hlt`. No SiliconOS é
+o pid 1, e os tiques dele no `ps` contam quanto tempo a CPU ficou parada
+(doc 15).
+
+**Acordar perdido** (*lost wakeup*)
+: Bug clássico de concorrência: o aviso "pode continuar" chega entre o
+"conferi: ainda não" e o "fui dormir", e se perde; o processo dorme
+esperando algo que já aconteceu. Evita-se fazendo a conferência e o
+bloqueio sem intervalo (doc 15).
+
 **ELF** (*Executable and Linkable Format*)
 : O formato de executável do Linux e de quase todo sistema que não é Windows
 nem macOS. Para carregar, o que importa são os **segmentos** (*program

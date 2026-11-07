@@ -112,14 +112,14 @@ em outras linguagens). A coluna "Usa" lista os módulos que ele chama.
 | `pic.rs` | Desliga o 8259 (o controlador de interrupções antigo). | `serial` | [08](08-interrupcoes-de-hardware.md) |
 | `apic.rs` | O APIC local: o controlador de interrupções de cada CPU; inclui o EOI ("terminei de tratar"). | `cpu`, `paginacao` | [08](08-interrupcoes-de-hardware.md) |
 | `ioapic.rs` | O I/O APIC: roteia as interrupções dos dispositivos (teclado...) para a CPU. | `paginacao` | [08](08-interrupcoes-de-hardware.md) |
-| `timer.rs` | O relógio: 100 tiques por segundo. A cada tique, avisa o escalonador. Também lê o relógio CMOS (RTC). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [12](12-escalonador.md) |
-| `teclado.rs` | Recebe os *scancodes* do teclado numa fila e os traduz em caracteres (layout US). | `apic` | [08](08-interrupcoes-de-hardware.md) |
+| `timer.rs` | O relógio: 100 tiques por segundo. A cada tique, avisa o escalonador (que acorda quem dormia e troca de processo). Também lê o relógio CMOS (RTC). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
+| `teclado.rs` | Recebe os *scancodes* do teclado numa fila, acorda quem espera tecla e traduz os scancodes em caracteres (layout US). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [15](15-dormir-e-bloqueio.md) |
 
 ### Processos e programas
 
 | Módulo | Trabalho | Usa | Doc |
 |---|---|---|---|
-| `escalonador.rs` | A tabela de processos e a **troca de contexto**: decide quem roda, troca de pilha, de CR3 e de TSS.RSP0. Cria, encerra e recolhe processos. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md) |
+| `escalonador.rs` | A tabela de processos e a **troca de contexto**: decide quem roda, troca de pilha, de CR3 e de TSS.RSP0. Cria, encerra e recolhe processos; bloqueia e acorda; tem o processo ocioso. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
 | `usuario/mod.rs` | Prepara um programa (espaço, código, pilha) e o entrega ao escalonador. Trata as syscalls (`tratar_syscall`) e as falhas dos programas. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
 | `usuario/syscall.rs` | A porta rápida para o kernel: configura os MSRs da instrução `syscall` e tem a entrada `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Lê arquivos ELF (o formato dos executáveis) e carrega os segmentos no espaço do programa. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
@@ -215,13 +215,13 @@ sequenceDiagram
     participant TR as teclado::tratador
     participant SH as shell
 
-    Note over SH: dorme em<br/>teclado::esperar (hlt)
+    Note over SH: Bloqueado(Teclado)<br/>(a CPU está no<br/>ocioso, em hlt)
     T->>CPU: interrupção<br/>vetor 0x31
     CPU->>TR: pula para o tratador<br/>(endereço da IDT)
     TR->>T: inb(0x60):<br/>scancode 0x1E
     Note over TR: põe 0x1E<br/>na FILA
     TR->>CPU: apic::eoi()
-    CPU->>SH: iretq:<br/>acorda do hlt
+    TR->>SH: acordar(Teclado)<br/>e ceder: troca<br/>para o shell
     Note over SH: proximo_scancode<br/>0x1E vira 'a'
     Note over SH: shell.tecla('a')<br/>kprint!("a")
 ```
@@ -275,6 +275,7 @@ As syscalls que existem hoje:
 | 1 | `escrever` | ponteiro, tamanho | bytes escritos (ou erro) |
 | 2 | `tiques` | nenhum | tiques desde o boot (100 por segundo) |
 | 3 | `pid` | nenhum | o número do processo |
+| 4 | `dormir` | milissegundos | 0, depois de dormir (doc [15](15-dormir-e-bloqueio.md)) |
 
 ---
 
@@ -295,6 +296,7 @@ sequenceDiagram
     A->>TM: tique! (vetor 0x30)<br/>pilha do kernel de A
     Note over TM: TIQUES += 1<br/>apic::eoi()
     TM->>ESC: tique(&quadro)
+    Note over ESC: acorda quem<br/>dormia até agora
     Note over ESC: +1 tique de CPU<br/>para A (mais de<br/>200? encerra A)
     Note over ESC: ceder:<br/>próximo Pronto = B<br/>TSS.RSP0 e CR3 de B
     ESC->>B: trocar(): guarda o RSP<br/>de A, carrega o de B
@@ -315,12 +317,18 @@ stateDiagram-v2
     [*] --> Pronto: criar
     Pronto --> Rodando: escolher_proximo
     Rodando --> Pronto: tique do timer ou ceder
+    Rodando --> Bloqueado: esperar_ate
+    Bloqueado --> Pronto: acordar, ou o timer
     Rodando --> Terminado: sair, exceção ou tempo esgotado
     Terminado --> [*]: recolher (libera pilha e espaço)
 ```
 
 `criar` é chamada por `usuario::iniciar` (programas embutidos) ou
-`usuario::iniciar_elf` (programas do disco). Um processo `Terminado` ainda ocupa memória (é um "zumbi") até alguém
+`usuario::iniciar_elf` (programas do disco). Um processo **Bloqueado** espera
+alguma coisa fora do rodízio: dormir (`Dormindo`, acordado pelo timer), uma
+tecla (`Teclado`, o shell) ou outro processo terminar (`Processo`). Quando
+ninguém pode rodar, roda o processo 1, o **ocioso**, que só faz `hlt` (doc
+[15](15-dormir-e-bloqueio.md)). Um processo `Terminado` ainda ocupa memória (é um "zumbi") até alguém
 **recolher** o resultado: o shell, quando o programa roda em primeiro plano
 (`escalonador::esperar`), ou o laço do shell, para os de segundo plano
 (`rodar X &`). Ao recolher, o `Drop` da pilha e do `EspacoEnderecos` devolve

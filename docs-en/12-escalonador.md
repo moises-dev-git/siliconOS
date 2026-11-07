@@ -1100,9 +1100,9 @@ Every function this chapter adds, in one sentence each. The most important ones 
 | `retirar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Removes a finished process from the table (fixing the current index) and returns the process and its result. |
 | `recolher` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | If process `pid` has ended, removes it, frees stack and space and returns the result. |
 | `recolher_segundo_plano` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Frees every background process that has already ended. |
-| `esperar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Yields the CPU until process `pid` ends and returns the result. |
+| `esperar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Yields the CPU until process `pid` ends and returns the result. (Since doc 15, blocked: out of the round robin until the process ends.) |
 | `pid_atual` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | The pid of whoever is running (the `pid` syscall). |
-| `ha_outros_prontos` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Is any process besides the current one ready to run? |
+| `ha_outros_prontos` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Is any process besides the current one ready to run? (Removed in doc 15: the shell now blocks.) |
 | `listar` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Pid, name, state and CPU ticks of each process (the `ps` command). |
 | `Processo::topo_pilha` | [escalonador.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/escalonador.rs) | Address of the top of the process's kernel stack (the TSS.RSP0 value). |
 | `definir_rsp0` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-12/src/gdt.rs) | Writes TSS.rsp[0] (through the `UnsafeCell`, with an unaligned write): the stack used on the next interrupt from ring 3. |

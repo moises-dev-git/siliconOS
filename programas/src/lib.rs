@@ -18,6 +18,7 @@ const SYS_SAIR: u64 = 0;
 const SYS_ESCREVER: u64 = 1;
 const SYS_TIQUES: u64 = 2;
 const SYS_PID: u64 = 3;
+const SYS_DORMIR: u64 = 4;
 
 /// Uma chamada de sistema com até dois argumentos, pela instrução
 /// `syscall` (doc 14). Número em RAX, argumentos em RDI e RSI, resultado em
@@ -53,6 +54,13 @@ pub fn tiques() -> u64 {
 /// O número deste processo.
 pub fn pid() -> u64 {
     chamada(SYS_PID, 0, 0)
+}
+
+/// Dorme por `ms` milissegundos sem gastar CPU (doc 15): o kernel tira o
+/// programa do rodízio e o devolve quando o prazo vence. A precisão é de um
+/// tique (10 ms).
+pub fn dormir(ms: u64) {
+    chamada(SYS_DORMIR, ms, 0);
 }
 
 /// Destino de `print!`: cada pedaço de texto formatado vira um `escrever`.

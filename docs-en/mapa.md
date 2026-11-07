@@ -116,14 +116,14 @@ other languages). The "Uses" column lists the modules it calls.
 | `pic.rs` | Disables the 8259 (the old interrupt controller). | `serial` | [08](08-interrupcoes-de-hardware.md) |
 | `apic.rs` | The local APIC: each CPU's interrupt controller; includes the EOI ("I'm done handling it"). | `cpu`, `paginacao` | [08](08-interrupcoes-de-hardware.md) |
 | `ioapic.rs` | The I/O APIC: routes the devices' interrupts (keyboard...) to the CPU. | `paginacao` | [08](08-interrupcoes-de-hardware.md) |
-| `timer.rs` | The clock: 100 ticks per second. On each tick, it tells the scheduler. Also reads the CMOS clock (RTC). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [12](12-escalonador.md) |
-| `teclado.rs` (keyboard) | Receives the keyboard's *scancodes* into a queue and translates them into characters (US layout). | `apic` | [08](08-interrupcoes-de-hardware.md) |
+| `timer.rs` | The clock: 100 ticks per second. On each tick, it tells the scheduler (which wakes up whoever was sleeping and switches processes). Also reads the CMOS clock (RTC). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
+| `teclado.rs` (keyboard) | Receives the keyboard's *scancodes* into a queue, wakes up whoever waits for a key and translates the scancodes into characters (US layout). | `apic`, `escalonador` | [08](08-interrupcoes-de-hardware.md), [15](15-dormir-e-bloqueio.md) |
 
 ### Processes and programs
 
 | Module | Job | Uses | Doc |
 |---|---|---|---|
-| `escalonador.rs` (scheduler) | The process table and the **context switch**: decides who runs, switches the stack, CR3 and TSS.RSP0. Creates, terminates and reaps processes. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md) |
+| `escalonador.rs` (scheduler) | The process table and the **context switch**: decides who runs, switches the stack, CR3 and TSS.RSP0. Creates, terminates and reaps processes; blocks and wakes them; holds the idle process. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
 | `usuario/mod.rs` (user) | Prepares a program (space, code, stack) and hands it to the scheduler. Handles the syscalls (`tratar_syscall`) and the programs' faults. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
 | `usuario/syscall.rs` | The fast door into the kernel: configures the MSRs of the `syscall` instruction and holds the entry `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Reads ELF files (the executable format) and loads the segments into the program's space. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
@@ -219,13 +219,13 @@ sequenceDiagram
     participant TR as teclado::tratador
     participant SH as shell
 
-    Note over SH: sleeps in<br/>teclado::esperar (hlt)
+    Note over SH: Bloqueado(Teclado)<br/>(the CPU is in<br/>the idle process, in hlt)
     T->>CPU: interrupt<br/>vector 0x31
     CPU->>TR: jumps to the handler<br/>(address from the IDT)
     TR->>T: inb(0x60):<br/>scancode 0x1E
     Note over TR: puts 0x1E<br/>in the FILA (queue)
     TR->>CPU: apic::eoi()
-    CPU->>SH: iretq:<br/>wakes up from hlt
+    TR->>SH: acordar(Teclado)<br/>and ceder: switches<br/>to the shell
     Note over SH: proximo_scancode<br/>0x1E becomes 'a'
     Note over SH: shell.tecla('a')<br/>kprint!("a")
 ```
@@ -278,6 +278,7 @@ The syscalls that exist today:
 | 1 | `escrever` (write) | pointer, length | bytes written (or an error) |
 | 2 | `tiques` (ticks) | none | ticks since boot (100 per second) |
 | 3 | `pid` | none | the process number |
+| 4 | `dormir` (sleep) | milliseconds | 0, after sleeping (doc [15](15-dormir-e-bloqueio.md)) |
 
 ---
 
@@ -298,6 +299,7 @@ sequenceDiagram
     A->>TM: tick! (vector 0x30)<br/>A's kernel stack
     Note over TM: TIQUES += 1<br/>apic::eoi()
     TM->>ESC: tique(&quadro)
+    Note over ESC: wakes up whoever<br/>slept until now
     Note over ESC: +1 CPU tick<br/>for A (over 200?<br/>terminate A)
     Note over ESC: ceder (yield):<br/>next Pronto = B<br/>B's TSS.RSP0 and CR3
     ESC->>B: trocar(): saves A's RSP,<br/>loads B's
@@ -318,13 +320,19 @@ stateDiagram-v2
     [*] --> Pronto: criar
     Pronto --> Rodando: escolher_proximo
     Rodando --> Pronto: timer tick or ceder
+    Rodando --> Bloqueado: esperar_ate
+    Bloqueado --> Pronto: acordar, or the timer
     Rodando --> Terminado: sair, exception or time limit
     Terminado --> [*]: recolher (frees stack and space)
 ```
 
-The states are `Pronto` (ready), `Rodando` (running) and `Terminado`
-(finished). `criar` (create) is called by `usuario::iniciar` (built-in
-programs) or `usuario::iniciar_elf` (programs from the disk). A `Terminado`
+The states are `Pronto` (ready), `Rodando` (running), `Bloqueado` (blocked)
+and `Terminado` (finished). `criar` (create) is called by `usuario::iniciar`
+(built-in programs) or `usuario::iniciar_elf` (programs from the disk). A
+**blocked** process waits for something outside the round robin: sleeping
+(`Dormindo`, woken by the timer), a key (`Teclado`, the shell) or another
+process to end (`Processo`). When nobody can run, process 1 runs: the
+**idle** process, which only does `hlt` (doc [15](15-dormir-e-bloqueio.md)). A `Terminado`
 process still takes up memory (it is a "zombie") until someone **reaps**
 (`recolher`) its result: the shell, when the program runs in the foreground
 (`escalonador::esperar`), or the shell loop, for background ones

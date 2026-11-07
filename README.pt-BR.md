@@ -32,6 +32,7 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Escalonador preemptivo: vários programas ao mesmo tempo | `src/escalonador.rs` | [12](docs/12-escalonador.md) |
 | Programas de usuário em Rust (ELF) num disco em RAM (tar) | `programas/`, `src/ramdisk.rs`, `src/usuario/elf.rs` | [13](docs/13-disco-em-ram-e-elf.md) |
 | Chamadas de sistema por `syscall`/`sysret` | `src/usuario/syscall.rs` | [14](docs/14-syscall-sysret.md) |
+| Processos bloqueados, processo ocioso e syscall `dormir` | `src/escalonador.rs` | [15](docs/15-dormir-e-bloqueio.md) |
 
 ## Rodar
 

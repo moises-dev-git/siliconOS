@@ -12,6 +12,7 @@
 use core::sync::atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering};
 
 use super::apic;
+use crate::escalonador::{self, Motivo};
 use crate::idt::QuadroInterrupcao;
 use crate::serial::{inb, outb};
 
@@ -56,6 +57,12 @@ pub extern "x86-interrupt" fn tratador(_quadro: QuadroInterrupcao) {
         ESCRITA.store(proxima, Ordering::Release);
     }
     apic::eoi();
+
+    // Acordar quem espera tecla (o shell, doc 15) e já dar a vez a ele:
+    // sem isso, a tecla só apareceria no próximo tique (até 10 ms depois).
+    if escalonador::acordar(Motivo::Teclado) > 0 {
+        escalonador::ceder();
+    }
 }
 
 /// Tira o próximo scancode da fila, se houver.
@@ -69,23 +76,11 @@ pub fn proximo_scancode() -> Option<u8> {
     Some(scancode)
 }
 
-fn fila_vazia() -> bool {
-    LEITURA.load(Ordering::Relaxed) == ESCRITA.load(Ordering::Acquire)
-}
-
-/// Dorme (`hlt`) até chegar alguma interrupção, mas só se a fila estiver
-/// vazia. O `cli` antes do teste e o par `sti; hlt` fecham a janela em que
-/// uma tecla chegaria entre "vi que está vazia" e "fui dormir": a CPU só
-/// aceita interrupções DEPOIS da instrução que segue o `sti`.
-pub fn esperar() {
-    unsafe {
-        core::arch::asm!("cli", options(nostack));
-        if fila_vazia() {
-            core::arch::asm!("sti; hlt", options(nostack));
-        } else {
-            core::arch::asm!("sti", options(nostack));
-        }
-    }
+/// Há scancode na fila? Desde o doc 15, quem espera tecla bloqueia com
+/// `escalonador::esperar_ate(Motivo::Teclado, teclado::tem_scancode)`; o
+/// tratador acorda. (Até o doc 14, `esperar()` fazia `sti; hlt` aqui.)
+pub fn tem_scancode() -> bool {
+    LEITURA.load(Ordering::Relaxed) != ESCRITA.load(Ordering::Acquire)
 }
 
 // ---------------------------------------------------------------------------

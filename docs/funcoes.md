@@ -6,7 +6,7 @@ Todas as funções do kernel, agrupadas pelo arquivo onde moram e em ordem alfab
 
 Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir das tabelas "Funções deste capítulo" de cada capítulo, toda vez que o site é publicado. Quando uma função mudou num capítulo posterior, a frase diz "(desde o doc NN ...)"; o código atual está sempre em [`src/`](https://github.com/moises-dev-git/siliconOS/tree/main/src).
 
-272 funções e 54 testes (ou ajudantes de teste), de 15 capítulos.
+287 funções e 61 testes (ou ajudantes de teste), de 16 capítulos.
 
 ---
 
@@ -76,13 +76,21 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 
 | Função | O que faz | Doc |
 |---|---|---|
+| `acordar` | Põe como `Pronto` todo processo bloqueado pelo motivo dado e devolve quantos; pode ser chamada de um tratador. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `acordar_em` | O mesmo que `acordar`, para quem já está com o lock da tabela (`encerrar`). | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `bloquear_e_trocar` | Marca o atual como `Bloqueado(motivo)` e troca de processo; volta quando o acordarem e chegar a vez dele. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `ceder` | Com as interrupções desligadas, escolhe o próximo e troca para ele; volta quando chegar de novo a vez deste. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `criar` | Cria um processo com pilha do kernel fabricada (6 registradores, retorno para `primeira_entrada`, quadro de `iretq`) e o põe na tabela como `Pronto`. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `dormir` | Bloqueia o processo atual por pelo menos tantos tiques, sem gastar CPU. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `encerrar` | Marca o processo atual como `Terminado`, imprime o resultado se for de segundo plano e cede para nunca mais voltar. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `escolher_proximo` | Rodízio: acha o próximo `Pronto`, atualiza os estados, troca TSS.RSP0 e CR3 e devolve os dois RSP para `trocar`. | [12](12-escalonador.md#funções-deste-capítulo) |
-| `esperar` | Cede a CPU até o processo `pid` terminar e devolve o resultado. | [12](12-escalonador.md#funções-deste-capítulo) |
-| `ha_outros_prontos` | Há algum processo, além do atual, pronto para rodar? | [12](12-escalonador.md#funções-deste-capítulo) |
+| `esperar` | Cede a CPU até o processo `pid` terminar e devolve o resultado. (Desde o doc 15, bloqueado: fica fora do rodízio até o processo terminar.) | [12](12-escalonador.md#funções-deste-capítulo) |
+| `esperar_ate` | Bloqueia o processo atual até a condição ser verdadeira, conferindo-a com as interrupções desligadas (sem acordar perdido). | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `ha_outros_prontos` | Há algum processo, além do atual, pronto para rodar? (Removida no doc 15: o shell passou a bloquear.) | [12](12-escalonador.md#funções-deste-capítulo) |
+| `ha_terminados_em_segundo_plano` | Há processo de segundo plano terminado esperando ser recolhido? (parte da condição do shell) | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `init` | Registra o código que está rodando (o kernel) como processo 0. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `janela_do_acordar_perdido` | (só com `teste-acordar-perdido`) Liga as interrupções por 3 s entre conferir e bloquear, para mostrar o bug. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `laco_ocioso` | (naked) O processo ocioso: `sti; hlt` para sempre; roda quando ninguém mais pode rodar. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `listar` | Pid, nome, estado e tiques de CPU de cada processo (comando `ps`). | [12](12-escalonador.md#funções-deste-capítulo) |
 | `pid_atual` | O pid de quem está rodando (a syscall `pid`). | [12](12-escalonador.md#funções-deste-capítulo) |
 | `primeira_entrada` | (naked) Onde o primeiro `trocar` de um processo novo "retorna": zera os registradores e faz `iretq` para o anel 3. | [12](12-escalonador.md#funções-deste-capítulo) |
@@ -90,6 +98,7 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `recolher` | Se o processo `pid` terminou, retira-o, libera pilha e espaço e devolve o resultado. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `recolher_segundo_plano` | Libera todos os processos de segundo plano que já terminaram. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `retirar` | Tira um processo terminado da tabela (corrigindo o índice do atual) e devolve o processo e o resultado. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `terminou` | O processo `pid` terminou (ou nem existe)? A condição de `esperar`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `tique` | Chamada pelo timer: conta o tempo de CPU do programa interrompido no anel 3, encerra quem passou do limite e cede a vez. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `trocar` | (naked) A troca de contexto: empilha 6 registradores, salva o RSP, carrega o RSP do outro processo, desempilha e `ret`. | [12](12-escalonador.md#funções-deste-capítulo) |
 
@@ -165,13 +174,14 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `digitar` | Ajudante dos testes: passa uma sequência de scancodes pelo decodificador e junta os caracteres. | [09](09-shell-e-testes.md#funções-deste-capítulo) |
 | `enviar_comando` | Espera o buffer de entrada do 8042 esvaziar e escreve um comando na porta 0x64. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `enviar_dado` | Espera o buffer de entrada esvaziar e escreve um byte de dado na porta 0x60. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
-| `esperar` | Dorme com `hlt` se a fila estiver vazia, usando `cli; teste; sti; hlt` para não perder uma tecla que chegue no meio. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
-| `fila_vazia` | A fila está vazia? (compara os índices de leitura e escrita). | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
+| `esperar` | Dorme com `hlt` se a fila estiver vazia, usando `cli; teste; sti; hlt` para não perder uma tecla que chegue no meio. (Substituída no doc 15: o shell bloqueia com `escalonador::esperar_ate` e o tratador o acorda.) | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
+| `fila_vazia` | A fila está vazia? (compara os índices de leitura e escrita). (Substituída no doc 15 por `tem_scancode`.) | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `init` | Descarta bytes velhos, lê a configuração do 8042, liga o bit de IRQ 1 e grava de volta. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `ler_dado` | Espera o buffer de saída encher e lê um byte da porta 0x60. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `perdidos` | Quantos scancodes foram descartados porque a fila estava cheia. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `proximo_scancode` | Tira o próximo scancode da fila (o lado consumidor da fila SPSC). | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 | `recebidos` | Quantos scancodes o tratador já recebeu. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
+| `tem_scancode` | Há scancode na fila? Substitui `esperar` e `fila_vazia`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `tratador` | Tratador do vetor 0x31: lê o scancode da porta 0x60, põe na fila (ou conta como perdido) e manda EOI. | [08](08-interrupcoes-de-hardware.md#funções-deste-capítulo) |
 
 ### [src/interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/interrupcoes/timer.rs)
@@ -380,6 +390,7 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | Função | O que faz | Doc |
 |---|---|---|
 | `descrever` | Texto curto do resultado de um programa ("terminou: codigo de saida 42"...). | [12](12-escalonador.md#funções-deste-capítulo) |
+| `dormir` (syscall) | Syscall 4: dorme `ms` milissegundos (arredondados para cima em tiques); devolve 0. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `encerrar` | Guarda o resultado e pula para `voltar_ao_kernel`; chamada de dentro de um tratador, nunca retorna. (Substituída no doc 12 por `escalonador::encerrar`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `entrada_syscall` | (naked) Tratador do vetor 0x80: empilha os registradores numa `Registros`, chama `tratar_syscall` e volta com `iretq`. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `entrar_no_anel3` | (naked) Salva os registradores do kernel e o RSP, monta à mão um quadro de interrupção (SS, RSP, RFLAGS, CS, RIP do programa) e executa `iretq`. (Substituída no doc 12 pela pilha fabricada de `escalonador::criar` + `primeira_entrada`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
@@ -388,6 +399,7 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `falha_do_programa` | Chamada pelos tratadores de exceção: se CS indica anel 3, imprime a falha e encerra o programa; senão retorna e o tratador dá panic. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `iniciar` | Prepara o espaço de endereços do programa (código e pilha) e o entrega ao escalonador; devolve o pid. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `iniciar_elf` | Cria o espaço, carrega o ELF, mapeia 4 páginas de pilha no fim da metade baixa e entrega ao escalonador com RSP = topo − 8. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `ms_para_tiques` | Milissegundos em tiques, arredondando para cima e sem estourar. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `nova_pagina_zerada` | Aloca um quadro e o zera (para o programa não ver lixo de quem usou o quadro antes). | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `rodar` | Mapeia código e pilha do programa com o bit USUARIO, entra no anel 3, e quando ele termina desmapeia tudo, libera os quadros e devolve o `Resultado`. (Desde o doc 11, num espaço de endereços próprio; desde o doc 12, é `iniciar` + `escalonador::esperar`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `rodar_por_nome` | Ajudante dos testes: procura o programa pelo nome e o roda. | [10](10-modo-usuario.md#funções-deste-capítulo) |
@@ -433,6 +445,12 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 |---|---|---|
 | `main` (dados) | Confere que a `.bss` veio zerada, escreve nela, soma 1 ao `CONTADOR` da `.data` e devolve o valor (42). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 
+### [programas/src/bin/insone.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/insone.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `main` (insone) | O mesmo que `soneca`, mas com espera ocupada. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+
 ### [programas/src/bin/medir.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/medir.rs)
 
 | Função | O que faz | Doc |
@@ -455,6 +473,12 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `main` (primos) | Conta os primos abaixo de 10 000, mostra os 10 primeiros e devolve a quantidade (1229). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `primo` | `n` é primo? (divisões até a raiz quadrada) | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 
+### [programas/src/bin/soneca.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/soneca.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `main` (soneca) | Acorda 5 vezes, a cada 500 ms, dormindo no intervalo. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+
 ### [programas/src/lib.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/lib.rs)
 
 | Função | O que faz | Doc |
@@ -462,6 +486,7 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `_start` (macro `principal!`) | Ponto de entrada gerado pela macro: chama o `main` do programa e passa o resultado a `sair`. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `chamada` | Faz uma chamada de sistema por `syscall`, avisando o compilador que RCX e R11 mudam. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
 | `Console::write_str` | `fmt::Write`: cada pedaço de texto formatado vira um `escrever` (base de `print!`/`println!`). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `dormir` (sos) | Chama a syscall `dormir`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `escrever` | Chamada de sistema 1: escreve bytes no console e devolve quantos (ou um erro negativo). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `panic` | Tratador de panic dos programas: imprime a mensagem e sai com 101. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `pid` | Chamada de sistema 3: o número do processo. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
@@ -497,8 +522,14 @@ Os `#[test_case]` que rodam com `cargo test` (doc [09](09-shell-e-testes.md)), a
 | `dois_contadores_ao_mesmo_tempo` | Teste: dois `contador` juntos levam menos de 300 tiques (um depois do outro seriam 500). | [12](12-escalonador.md#funções-deste-capítulo) |
 | `dois_lacos_dividem_a_cpu` | Teste: dois `laco` juntos levam pelo menos 390 tiques de relógio, porque cada um precisa de 200 de CPU. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `iniciar` (dos testes) | Ajudante: inicia um programa embutido pelo nome, sem segundo plano. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `insone_gasta_a_cpu_e_e_encerrado` | Teste: o `insone` não deixa a CPU parar e é encerrado por tempo esgotado. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `o_kernel_dorme_e_a_cpu_fica_parada` | Teste: `dormir(20)` leva 20 ou 21 tiques, quase todos com o ocioso rodando. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `o_kernel_e_o_processo_zero` | Teste: quem roda os testes é o processo 0, "kernel", `Rodando`. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `o_ocioso_e_o_processo_um` | Teste: o processo 1 é o "ocioso" e está `Pronto`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `processo_terminado_devolve_pilha_e_quadros` | Teste: depois de recolhido, o processo some da tabela e quadros e heap voltam ao que eram. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `rodar_do_disco` | Ajudante: roda um programa do disco em RAM e espera o resultado. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `soneca_dorme_sem_gastar_cpu` | Teste: enquanto o `soneca` existe, a CPU fica parada pelo menos 90% do tempo. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `tiques_ociosos` | Ajudante: os tiques do ocioso até agora (tempo de CPU parada). | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 
 ### src/interrupcoes/teclado.rs
 
@@ -589,6 +620,7 @@ Os `#[test_case]` que rodam com `cargo test` (doc [09](09-shell-e-testes.md)), a
 |---|---|---|
 | `invasor_encerrado_por_page_fault` | Teste: `invasor` (lê memória do kernel) termina por #PF. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `laco_encerrado_pelo_timer` | Teste: `laco` (laço infinito) é encerrado pelo timer. | [10](10-modo-usuario.md#funções-deste-capítulo) |
+| `milissegundos_viram_tiques_para_cima` | Teste: 1 ms vira 1 tique, 11 ms viram 2, `u64::MAX` não estoura. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `nada_fica_mapeado_nem_vaza` | Teste: depois de um aquecimento, rodar `ola` deixa os endereços do programa desmapeados e os quadros livres no mesmo número. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `ola_sai_com_42` | Teste: `ola` escreve e sai com 42. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `ponteiro_do_kernel_recusado` | Teste: `ponteiro` passa um endereço do kernel, recebe -14 e sai com 1. | [10](10-modo-usuario.md#funções-deste-capítulo) |

@@ -71,8 +71,9 @@ interrupts, with the timer and the keyboard (doc 08), and an interactive
 shell with automated tests (doc 09). Step 6 has begun: doc 10 runs the
 first isolated programs, in user mode, doc 11 gives each program its
 own address space, doc 12 runs several of them at once, with a
-scheduler, doc 13 loads them from ELF files written in Rust, and doc 14 switches the
-door into the kernel to `syscall`/`sysret`.
+scheduler, doc 13 loads them from ELF files written in Rust, doc 14 switches the
+door into the kernel to `syscall`/`sysret`, and doc 15 lets a process wait (sleep,
+or wait for a key) without using the CPU.
 
 ---
 

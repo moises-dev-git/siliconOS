@@ -1234,3 +1234,68 @@ cada lugar onde ela é chamada, em vez de fazer um `call`. Para funções
 minúsculas como `chamada`, evita o custo de uma chamada de função em volta
 de cada chamada de sistema. Sem o atributo, o compilador decide sozinho (e
 quase sempre acerta); com ele, a decisão é nossa.
+
+---
+
+## 45. `impl Fn`, variantes com campos e aritmética sem estouro
+
+```rust
+pub fn esperar_ate(motivo: Motivo, condicao: impl Fn() -> bool) {
+    cpu::sem_interrupcoes(|| {
+        while !condicao() {
+            bloquear_e_trocar(motivo);
+        }
+    });
+}
+
+escalonador::esperar_ate(Motivo::Teclado, || teclado::tem_scancode());
+```
+
+**`impl Fn() -> bool`** recebe uma closure, como o `impl FnOnce` do
+[§30](#30-receber-uma-closure-impl-fnonce), mas promete ao compilador algo
+diferente: a closure será chamada **várias vezes** (aqui, a cada volta do
+`while`). `FnOnce` não serviria: uma closure `FnOnce` pode consumir o que
+capturou na primeira chamada. Na prática, escolha a mais permissiva que o
+seu uso permite: `FnOnce` se chama uma vez, `FnMut` se chama várias e a
+closure precisa alterar o que capturou, `Fn` se chama várias e ela só lê.
+
+**Variantes com campos nomeados.** Uma variante de `enum` pode carregar
+dados de dois jeitos: em posição, `Processo(Pid)`, ou com nome, como uma
+struct:
+
+```rust
+pub enum Motivo {
+    Dormindo { ate: u64 },
+    Teclado,
+    Processo(Pid),
+}
+
+let m = Motivo::Dormindo { ate: 500 };
+if let Estado::Bloqueado(Motivo::Dormindo { ate }) = p.estado {
+    // aqui, `ate` é o u64 que estava dentro
+}
+```
+
+O nome serve de documentação: `Dormindo { ate: 500 }` diz mais que
+`Dormindo(500)`. O `if let` com o padrão aninhado testa as duas camadas
+(é `Bloqueado`? por `Dormindo`?) e já extrai o campo, como uma
+desestruturação em JS (`const { ate } = motivo`) que só acontece se o
+formato bater.
+
+**Aritmética que não estoura.** Em Rust, `a * b` que passa do limite do
+tipo dá panic nas builds de depuração (e dá a volta, silenciosamente, nas de
+produção). Quando o número vem de fora (aqui, os milissegundos que um
+programa pede), o kernel não pode cair por causa dele. Os métodos dizem o
+que fazer no limite:
+
+| Método | `u64::MAX * 100` vira | Uso |
+|---|---|---|
+| `a.saturating_mul(b)` | `u64::MAX` (gruda no limite) | "muito" continua sendo "muito" |
+| `a.checked_mul(b)` | `None` | quando o estouro é um erro a tratar |
+| `a.wrapping_mul(b)` | o resto da divisão por 2⁶⁴ | contadores que dão a volta de propósito |
+
+E `a.div_ceil(b)` divide **arredondando para cima**: `1.div_ceil(10)` é 1,
+e não 0.
+
+`Option::is_none_or(f)`, usado em `terminou`, é "está vazio, ou o valor
+dentro satisfaz `f`": `procurar(pid).is_none_or(|p| terminado(p))`.

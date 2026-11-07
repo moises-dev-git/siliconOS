@@ -139,6 +139,27 @@ gives the CPU back when it wants to (doc 12).
 : A process that has already ended but stays in the table until someone
 reads its result and frees its memory (doc 12).
 
+**Busy waiting**
+: Waiting by asking over and over ("is it time yet?", "has a key arrived?").
+The process stays in the round robin and burns the whole CPU doing nothing
+useful (doc 15).
+
+**Blocked** (process state)
+: Waiting for something (a deadline, a key, another process to end), out of
+the round robin. It becomes ready again when someone **wakes it up**: whoever
+made the thing happen (doc 15).
+
+**Idle process**
+: The process that runs when no other one can: it only does `hlt`. In
+SiliconOS it is pid 1, and its ticks in `ps` count how long the CPU sat
+stopped (doc 15).
+
+**Lost wakeup**
+: A classic concurrency bug: the "you can go on" notice arrives between
+"checked: not yet" and "went to sleep", and is lost; the process sleeps
+waiting for something that already happened. It is avoided by checking and
+blocking with no gap in between (doc 15).
+
 **ELF** (*Executable and Linkable Format*)
 : The executable format of Linux and of almost every system that is neither
 Windows nor macOS. For loading, what matters are the LOAD **segments**

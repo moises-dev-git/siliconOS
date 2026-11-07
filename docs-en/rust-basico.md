@@ -1245,3 +1245,67 @@ every call site instead of emitting a `call`. For tiny functions like
 `chamada`, it avoids the cost of a function call around every system call.
 Without the attribute the compiler decides on its own (and is almost always
 right); with it, the decision is ours.
+
+---
+
+## 45. `impl Fn`, variants with fields and arithmetic that does not overflow
+
+```rust
+pub fn esperar_ate(motivo: Motivo, condicao: impl Fn() -> bool) {
+    cpu::sem_interrupcoes(|| {
+        while !condicao() {
+            bloquear_e_trocar(motivo);
+        }
+    });
+}
+
+escalonador::esperar_ate(Motivo::Teclado, || teclado::tem_scancode());
+```
+
+**`impl Fn() -> bool`** takes a closure, like the `impl FnOnce` in
+[§30](#30-taking-a-closure-impl-fnonce), but promises the compiler something
+different: the closure will be called **several times** (here, on each turn
+of the `while`). `FnOnce` would not do: an `FnOnce` closure may consume what
+it captured on its first call. In practice, pick the most permissive one your
+use allows: `FnOnce` if you call it once, `FnMut` if you call it several
+times and the closure needs to change what it captured, `Fn` if you call it
+several times and it only reads.
+
+**Variants with named fields.** An `enum` variant can carry data in two
+ways: by position, `Processo(Pid)`, or by name, like a struct:
+
+```rust
+pub enum Motivo {
+    Dormindo { ate: u64 },
+    Teclado,
+    Processo(Pid),
+}
+
+let m = Motivo::Dormindo { ate: 500 };
+if let Estado::Bloqueado(Motivo::Dormindo { ate }) = p.estado {
+    // here, `ate` is the u64 that was inside
+}
+```
+
+The name works as documentation: `Dormindo { ate: 500 }` ("sleeping until
+500") says more than `Dormindo(500)`. The `if let` with the nested pattern
+tests both layers (is it `Bloqueado`? because of `Dormindo`?) and pulls the
+field out, like a JS destructuring (`const { ate } = motivo`) that only
+happens if the shape matches.
+
+**Arithmetic that does not overflow.** In Rust, an `a * b` that goes past the
+type's limit panics in debug builds (and silently wraps around in release
+builds). When the number comes from outside (here, the milliseconds a program
+asks for), the kernel must not crash because of it. These methods say what
+to do at the limit:
+
+| Method | `u64::MAX * 100` becomes | Use |
+|---|---|---|
+| `a.saturating_mul(b)` | `u64::MAX` (sticks to the limit) | "a lot" stays "a lot" |
+| `a.checked_mul(b)` | `None` | when overflowing is an error to handle |
+| `a.wrapping_mul(b)` | the remainder modulo 2⁶⁴ | counters that wrap on purpose |
+
+And `a.div_ceil(b)` divides **rounding up**: `1.div_ceil(10)` is 1, not 0.
+
+`Option::is_none_or(f)`, used in `terminou`, means "it is empty, or the value
+inside satisfies `f`": `find(pid).is_none_or(|p| finished(p))`.

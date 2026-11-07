@@ -47,6 +47,7 @@ pub const SYS_SAIR: u64 = 0;
 pub const SYS_ESCREVER: u64 = 1;
 pub const SYS_TIQUES: u64 = 2;
 pub const SYS_PID: u64 = 3;
+pub const SYS_DORMIR: u64 = 4;
 
 // Erros devolvidos em RAX, negativos como no Linux.
 pub const ERRO_ENDERECO: u64 = -14i64 as u64;  // EFAULT: ponteiro inválido
@@ -196,6 +197,7 @@ extern "sysv64" fn tratar_syscall(r: &mut Registros) {
         SYS_ESCREVER => escrever(r.rdi, r.rsi),
         SYS_TIQUES => timer::tiques(),
         SYS_PID => escalonador::pid_atual() as u64,
+        SYS_DORMIR => dormir(r.rdi),
         _ => ERRO_SYSCALL,
     };
 }
@@ -220,6 +222,19 @@ pub fn faixa_do_programa(inicio: u64, tamanho: u64) -> bool {
     true
 }
 
+/// Syscall `dormir` (doc 15): bloqueia o programa por `ms` milissegundos,
+/// arredondados para cima em tiques (10 ms cada). Devolve 0.
+fn dormir(ms: u64) -> u64 {
+    escalonador::dormir(ms_para_tiques(ms));
+    0
+}
+
+/// Milissegundos em tiques do timer, arredondando para cima: pedir 1 ms
+/// dorme 1 tique (10 ms), nunca 0.
+fn ms_para_tiques(ms: u64) -> u64 {
+    ms.saturating_mul(timer::FREQUENCIA_HZ).div_ceil(1000)
+}
+
 fn escrever(ponteiro: u64, tamanho: u64) -> u64 {
     if !faixa_do_programa(ponteiro, tamanho) {
         kprintln!("[kernel] escrever(): ponteiro {:#x} fora da memoria do programa, recusado", ponteiro);
@@ -238,6 +253,16 @@ mod testes {
 
     fn rodar_por_nome(nome: &str) -> Resultado {
         rodar(programas::procurar(nome).unwrap())
+    }
+
+    #[test_case]
+    fn milissegundos_viram_tiques_para_cima() {
+        assert_eq!(ms_para_tiques(0), 0);
+        assert_eq!(ms_para_tiques(1), 1);
+        assert_eq!(ms_para_tiques(10), 1);
+        assert_eq!(ms_para_tiques(11), 2);
+        assert_eq!(ms_para_tiques(500), 50);
+        assert_eq!(ms_para_tiques(u64::MAX), u64::MAX.div_ceil(1000));
     }
 
     #[test_case]

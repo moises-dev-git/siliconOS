@@ -74,8 +74,9 @@ interativo com testes automáticos (doc 09). A etapa 6 começou: o doc 10
 roda os primeiros programas isolados, no modo usuário, o doc 11 dá a cada
 programa o seu próprio espaço de endereços, o doc 12 faz vários deles
 rodarem ao mesmo tempo, com um escalonador, o doc 13 os carrega de
-arquivos ELF, escritos em Rust, e o doc 14 troca a porta de entrada no kernel
-por `syscall`/`sysret`.
+arquivos ELF, escritos em Rust, o doc 14 troca a porta de entrada no kernel
+por `syscall`/`sysret`, e o doc 15 deixa um processo esperar (dormir, ou
+esperar uma tecla) sem gastar a CPU.
 
 ---
 

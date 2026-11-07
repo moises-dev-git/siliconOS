@@ -44,5 +44,7 @@ teste-sem-eoi = []
 teste-print-interrupcao = []
 # Igual ao anterior, mas sem desligar as interrupções no kprintln!: trava
 teste-deadlock = ["teste-print-interrupcao"]
+# Abre de propósito a janela do "acordar perdido" (docs/15-dormir-e-bloqueio.md)
+teste-acordar-perdido = []
 # cargo test: inclui um teste que falha de propósito (docs/09-shell-e-testes.md)
 teste-que-falha = []

@@ -69,6 +69,7 @@ book and then the matching document.
 | [12: The scheduler](12-escalonador.md) | Processes, context switch, a kernel stack per process, timer preemption, `ps` and `&` | 11.4 | ✅ |
 | [13: RAM disk and ELF](13-disco-em-ram-e-elf.md) | User programs in Rust, linker script, tar format, ELF loader | 11.4 | ✅ |
 | [14: syscall and sysret](14-syscall-sysret.md) | The fast door into the kernel: STAR/LSTAR/FMASK MSRs, manual stack switch, cycle measurements | 11.4 | ✅ |
+| [15: Sleeping and blocked processes](15-dormir-e-bloqueio.md) | Blocked state, idle process, the `dormir` syscall, the lost wakeup | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 | [SiliconOS map](mapa.md) | System diagrams | — | ✅ |
@@ -136,6 +137,7 @@ kernel handles it):
 | `./run.sh teste-print-interrupcao` | `kprint!` inside the timer handler (works) | 08 |
 | `./run.sh teste-deadlock` | the same without `kprintln!`'s protection (must freeze) | 08 |
 | `./run.sh teste-teclado` | shows every scancode received from the keyboard | 08 |
+| `./run.sh teste-acordar-perdido` | opens the window between checking and blocking: a key typed in it only shows up with the next one | 15 |
 | `cargo test --target x86_64-unknown-uefi --features teste-que-falha` | includes a `#[test_case]` that fails (`cargo test` must fail) | 09 |
 
 To change the emulated machine's memory (default: 128 MiB), use `RAM`, for

@@ -15,6 +15,12 @@
 //! Regra que torna isto seguro: todo lock do kernel é pego com as
 //! interrupções desligadas (`cpu::sem_interrupcoes`). Assim o timer nunca
 //! troca de processo no meio de uma seção crítica.
+//!
+//! Desde o doc 15 (docs/15-dormir-e-bloqueio.md), um processo pode ficar
+//! BLOQUEADO esperando alguma coisa (um prazo, uma tecla, outro processo)
+//! sem gastar CPU: `esperar_ate` tira ele do rodízio e `acordar` (ou o
+//! timer, para quem dorme) o devolve. Quando ninguém pode rodar, roda o
+//! processo 1, o OCIOSO, que só faz `hlt`.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -24,6 +30,7 @@ use spin::Mutex;
 use crate::cpu;
 use crate::gdt;
 use crate::idt::QuadroInterrupcao;
+use crate::interrupcoes::timer;
 use crate::kprintln;
 use crate::memoria::espaco::EspacoEnderecos;
 use crate::memoria::paginacao;
@@ -40,9 +47,26 @@ pub enum Estado {
     Pronto,
     /// É o processo que está na CPU agora.
     Rodando,
+    /// Esperando alguma coisa (doc 15). Fora do rodízio até ser acordado.
+    Bloqueado(Motivo),
     /// Terminou; espera alguém recolher o resultado e liberar a memória.
     Terminado(Resultado),
 }
+
+/// O que um processo bloqueado espera (doc 15).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Motivo {
+    /// Dormindo até o tique `ate` do timer (syscall `dormir`).
+    Dormindo { ate: u64 },
+    /// Uma tecla (o shell). Também acordado quando termina um processo de
+    /// segundo plano, para o shell recolher a memória dele.
+    Teclado,
+    /// O processo `Pid` terminar (`esperar`).
+    Processo(Pid),
+}
+
+/// Índice e pid do processo ocioso: sempre o segundo da tabela.
+const OCIOSO: usize = 1;
 
 pub struct Processo {
     pub pid: Pid,
@@ -54,7 +78,8 @@ pub struct Processo {
     pilha: Option<Box<[u64]>>,
     /// Espaço de endereços (None no processo 0: usa as tabelas do kernel).
     espaco: Option<EspacoEnderecos>,
-    /// Tiques do timer que pegaram este processo no anel 3.
+    /// Tiques do timer que pegaram este processo no anel 3 (no ocioso:
+    /// os tiques em que a CPU estava parada, desde o doc 15).
     pub tiques_cpu: u64,
     /// Ninguém espera por ele: o resultado é impresso ao terminar.
     pub segundo_plano: bool,
@@ -78,8 +103,16 @@ struct Tabela {
 
 static TABELA: Mutex<Tabela> = Mutex::new(Tabela { processos: Vec::new(), atual: 0, proximo_pid: 1 });
 
-/// Registra o código que está rodando agora (o kernel) como processo 0.
+/// Registra o código que está rodando agora (o kernel) como processo 0 e
+/// cria o processo 1, o ocioso (doc 15).
 pub fn init() {
+    // A pilha do ocioso, fabricada como a dos outros (ver `criar`), mas o
+    // `ret` do primeiro `trocar` cai direto em `laco_ocioso`, no anel 0.
+    let mut pilha = alloc::vec![0u64; TAM_PILHA_OCIOSO / 8].into_boxed_slice();
+    let n = pilha.len();
+    pilha[n - 1] = laco_ocioso as *const () as u64;
+    let rsp_ocioso = &pilha[n - 7] as *const u64 as u64;
+
     cpu::sem_interrupcoes(|| {
         let mut t = TABELA.lock();
         assert!(t.processos.is_empty(), "escalonador::init chamado duas vezes");
@@ -87,7 +120,28 @@ pub fn init() {
             pid: 0, nome: "kernel", estado: Estado::Rodando, rsp: 0,
             pilha: None, espaco: None, tiques_cpu: 0, segundo_plano: false,
         }));
+        t.processos.push(Box::new(Processo {
+            pid: 1, nome: "ocioso", estado: Estado::Pronto, rsp: rsp_ocioso,
+            pilha: Some(pilha), espaco: None, tiques_cpu: 0, segundo_plano: false,
+        }));
+        t.proximo_pid = 2;
     });
+}
+
+/// Pilha do ocioso: só recebe os quadros das interrupções que o acordam.
+const TAM_PILHA_OCIOSO: usize = 4 * 1024;
+
+/// O processo ocioso: roda quando nenhum outro pode rodar. `hlt` para a
+/// CPU até a próxima interrupção; o tratador dela pode trocar de processo
+/// (o timer sempre tenta) e, quando o ocioso voltar, ele dorme de novo.
+#[unsafe(naked)]
+unsafe extern "sysv64" fn laco_ocioso() -> ! {
+    naked_asm!(
+        "2:",
+        "sti",
+        "hlt",
+        "jmp 2b",
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -176,11 +230,23 @@ pub fn ceder() {
 /// Escolhe o próximo, prepara a CPU para ele (CR3, TSS.RSP0) e devolve o
 /// que `trocar` precisa. O lock é solto ANTES da troca: o próximo processo
 /// vai precisar dele.
+///
+/// Desde o doc 15: o ocioso só é escolhido quando ninguém mais está pronto
+/// e o atual não pode continuar (bloqueou ou terminou).
 fn escolher_proximo() -> Option<(*mut u64, u64)> {
     let mut t = TABELA.lock();
     let n = t.processos.len();
     let atual = t.atual;
-    let proximo = (1..n).map(|d| (atual + d) % n).find(|&i| t.processos[i].estado == Estado::Pronto)?;
+    let pronto = (1..n).map(|d| (atual + d) % n)
+        .find(|&i| i != OCIOSO && t.processos[i].estado == Estado::Pronto);
+    let proximo = match pronto {
+        Some(i) => i,
+        None if t.processos[atual].estado == Estado::Rodando => return None,
+        None => OCIOSO,
+    };
+    if proximo == atual {
+        return None;
+    }
 
     if t.processos[atual].estado == Estado::Rodando {
         t.processos[atual].estado = Estado::Pronto;
@@ -201,6 +267,21 @@ fn escolher_proximo() -> Option<(*mut u64, u64)> {
 
 /// Chamada pelo tratador do timer (depois do EOI), a cada tique.
 pub fn tique(quadro: &QuadroInterrupcao) {
+    // Acordar quem dormia até agora (doc 15) e contar o tempo do ocioso.
+    let agora = timer::tiques();
+    cpu::sem_interrupcoes(|| {
+        let mut t = TABELA.lock();
+        for p in t.processos.iter_mut() {
+            if let Estado::Bloqueado(Motivo::Dormindo { ate }) = p.estado {
+                if agora >= ate {
+                    p.estado = Estado::Pronto;
+                }
+            }
+        }
+        if t.atual == OCIOSO {
+            t.processos[OCIOSO].tiques_cpu += 1;
+        }
+    });
     if quadro.cs & 3 == 3 {
         // O tique pegou um programa no anel 3: conta o tempo de CPU dele.
         let excedeu = cpu::sem_interrupcoes(|| {
@@ -232,7 +313,14 @@ pub fn encerrar(resultado: Resultado) -> ! {
         assert!(a != 0, "o kernel (processo 0) nao pode ser encerrado");
         let p = &mut t.processos[a];
         p.estado = Estado::Terminado(resultado);
-        (p.pid, p.nome, p.segundo_plano)
+        let (pid, nome, segundo_plano) = (p.pid, p.nome, p.segundo_plano);
+        // Quem espera por este processo pode continuar (doc 15). Se ninguém
+        // espera (segundo plano), o shell é acordado para recolher a memória.
+        acordar_em(&mut t, Motivo::Processo(pid));
+        if segundo_plano {
+            acordar_em(&mut t, Motivo::Teclado);
+        }
+        (pid, nome, segundo_plano)
     };
     if segundo_plano {
         kprintln!("\n[{}] '{}' {}", pid, nome, usuario::descrever(resultado));
@@ -278,15 +366,100 @@ pub fn recolher_segundo_plano() {
     }
 }
 
-/// Espera o processo `pid` terminar e devolve o resultado. Enquanto isso,
-/// cede a CPU para os outros processos.
+/// Espera o processo `pid` terminar e devolve o resultado. Desde o doc 15,
+/// bloqueado: não volta para o rodízio até o processo terminar.
 pub fn esperar(pid: Pid) -> Resultado {
-    loop {
-        if let Some(r) = recolher(pid) {
-            return r;
+    esperar_ate(Motivo::Processo(pid), || terminou(pid));
+    recolher(pid).unwrap_or_else(|| panic!("esperar: o processo {} nao existe", pid))
+}
+
+/// O processo `pid` terminou (ou nem existe)?
+fn terminou(pid: Pid) -> bool {
+    cpu::sem_interrupcoes(|| {
+        let t = TABELA.lock();
+        t.processos.iter().find(|p| p.pid == pid).is_none_or(|p| matches!(p.estado, Estado::Terminado(_)))
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Bloquear e acordar (doc 15)
+// ---------------------------------------------------------------------------
+
+/// Bloqueia o processo atual até `condicao()` ser verdadeira. Quem torna a
+/// condição verdadeira chama `acordar(motivo)` (ou é o timer, para
+/// `Dormindo`); o processo então confere a condição de novo.
+///
+/// A condição é conferida COM AS INTERRUPÇÕES DESLIGADAS, e assim continua
+/// até o processo estar marcado como bloqueado. Sem isso, o aviso podia
+/// chegar entre "conferi: ainda não" e "fui dormir", e se perder: o
+/// processo dormiria esperando algo que já aconteceu (o "acordar perdido").
+pub fn esperar_ate(motivo: Motivo, condicao: impl Fn() -> bool) {
+    cpu::sem_interrupcoes(|| {
+        while !condicao() {
+            #[cfg(feature = "teste-acordar-perdido")]
+            janela_do_acordar_perdido();
+            bloquear_e_trocar(motivo);
         }
-        ceder();
+    });
+}
+
+/// Marca o atual como bloqueado e passa a CPU adiante. Volta quando alguém
+/// o acordar e chegar de novo a vez dele. Interrupções desligadas.
+fn bloquear_e_trocar(motivo: Motivo) {
+    {
+        let mut t = TABELA.lock();
+        let a = t.atual;
+        assert!(a != OCIOSO, "o ocioso nunca bloqueia");
+        t.processos[a].estado = Estado::Bloqueado(motivo);
     }
+    if let Some((salvar, novo_rsp)) = escolher_proximo() {
+        unsafe { trocar(salvar, novo_rsp) };
+    }
+}
+
+/// `./run.sh teste-acordar-perdido`: abre, de propósito, a janela que
+/// `esperar_ate` fecha. Liga as interrupções por 3 segundos DEPOIS de
+/// conferir a condição e ANTES de bloquear. Uma tecla apertada nesse
+/// intervalo chega, acha ninguém bloqueado para acordar, e se perde.
+#[cfg(feature = "teste-acordar-perdido")]
+fn janela_do_acordar_perdido() {
+    let fim = timer::tiques() + 3 * timer::FREQUENCIA_HZ;
+    crate::kprint!("[janela aberta no tique {}]", timer::tiques());
+    while timer::tiques() < fim {
+        cpu::ligar_interrupcoes();
+        unsafe { core::arch::asm!("hlt") };
+        cpu::desligar_interrupcoes();
+    }
+    crate::kprint!("[janela fechada no tique {}: bloqueando]", timer::tiques());
+}
+
+/// Acorda (põe como `Pronto`) todos os processos bloqueados por `motivo`.
+/// Devolve quantos acordaram. Pode ser chamada de um tratador de interrupção.
+pub fn acordar(motivo: Motivo) -> usize {
+    cpu::sem_interrupcoes(|| acordar_em(&mut TABELA.lock(), motivo))
+}
+
+fn acordar_em(t: &mut Tabela, motivo: Motivo) -> usize {
+    let mut n = 0;
+    for p in t.processos.iter_mut().filter(|p| p.estado == Estado::Bloqueado(motivo)) {
+        p.estado = Estado::Pronto;
+        n += 1;
+    }
+    n
+}
+
+/// Dorme (bloqueado, sem gastar CPU) por pelo menos `tiques` tiques.
+pub fn dormir(tiques: u64) {
+    let ate = timer::tiques() + tiques;
+    esperar_ate(Motivo::Dormindo { ate }, || timer::tiques() >= ate);
+}
+
+/// Há algum processo de segundo plano terminado, esperando ser recolhido?
+pub fn ha_terminados_em_segundo_plano() -> bool {
+    cpu::sem_interrupcoes(|| {
+        let t = TABELA.lock();
+        t.processos.iter().any(|p| p.segundo_plano && matches!(p.estado, Estado::Terminado(_)))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -298,14 +471,6 @@ pub fn pid_atual() -> Pid {
     cpu::sem_interrupcoes(|| {
         let t = TABELA.lock();
         t.processos.get(t.atual).map_or(0, |p| p.pid)
-    })
-}
-
-/// Há algum processo, além do atual, pronto para rodar?
-pub fn ha_outros_prontos() -> bool {
-    cpu::sem_interrupcoes(|| {
-        let t = TABELA.lock();
-        t.processos.iter().enumerate().any(|(i, p)| i != t.atual && p.estado == Estado::Pronto)
     })
 }
 
@@ -358,6 +523,55 @@ mod testes {
         let total = timer::tiques() - inicio;
         crate::kprint!("({} tiques) ", total);
         assert!(total >= 2 * usuario::LIMITE_TIQUES - 10, "levou so {} tiques", total);
+    }
+
+    /// Tiques de CPU parada (os do ocioso) até agora.
+    fn tiques_ociosos() -> u64 {
+        listar()[OCIOSO].3
+    }
+
+    fn rodar_do_disco(nome: &str) -> Resultado {
+        let arquivo = crate::ramdisk::abrir(nome).unwrap();
+        esperar(usuario::iniciar_elf(arquivo.nome, arquivo.dados, false).unwrap())
+    }
+
+    #[test_case]
+    fn o_ocioso_e_o_processo_um() {
+        let lista = listar();
+        assert_eq!((lista[OCIOSO].0, lista[OCIOSO].1), (1, "ocioso"));
+        assert_eq!(lista[OCIOSO].2, Estado::Pronto);
+    }
+
+    #[test_case]
+    fn o_kernel_dorme_e_a_cpu_fica_parada() {
+        let (inicio, ocioso) = (timer::tiques(), tiques_ociosos());
+        dormir(20);
+        let (passou, parada) = (timer::tiques() - inicio, tiques_ociosos() - ocioso);
+        crate::kprint!("({} tiques, {} com a CPU parada) ", passou, parada);
+        assert!((20..=21).contains(&passou), "dormiu {} tiques", passou);
+        assert!(parada >= 19, "so {} tiques ociosos", parada);
+    }
+
+    #[test_case]
+    fn soneca_dorme_sem_gastar_cpu() {
+        // 5 x 500 ms: uns 250 tiques de relógio, quase todos com a CPU parada.
+        let (inicio, ocioso) = (timer::tiques(), tiques_ociosos());
+        assert_eq!(rodar_do_disco("soneca"), Resultado::Saiu(0));
+        let (passou, parada) = (timer::tiques() - inicio, tiques_ociosos() - ocioso);
+        crate::kprint!("({} tiques, {} com a CPU parada) ", passou, parada);
+        assert!(passou >= 200, "levou so {} tiques", passou);
+        assert!(parada * 10 >= passou * 9, "so {} de {} tiques ociosos", parada, passou);
+    }
+
+    #[test_case]
+    fn insone_gasta_a_cpu_e_e_encerrado() {
+        // A mesma espera, mas ocupada: a CPU nunca para, e o kernel encerra
+        // o programa ao passar do limite de tempo de CPU.
+        let ocioso = tiques_ociosos();
+        assert_eq!(rodar_do_disco("insone"), Resultado::TempoEsgotado);
+        let parada = tiques_ociosos() - ocioso;
+        crate::kprint!("({} tiques com a CPU parada) ", parada);
+        assert!(parada < 10, "{} tiques ociosos", parada);
     }
 
     #[test_case]

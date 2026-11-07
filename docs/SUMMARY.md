@@ -19,6 +19,7 @@
 - [12: O escalonador](12-escalonador.md)
 - [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md)
 - [14: syscall e sysret](14-syscall-sysret.md)
+- [15: Dormir e bloqueio](15-dormir-e-bloqueio.md)
 
 # Referência
 

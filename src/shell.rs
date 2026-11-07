@@ -9,7 +9,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::escalonador;
+use crate::escalonador::{self, Motivo};
 use crate::interrupcoes::{self, teclado, timer};
 use crate::memoria::{self, heap, quadros};
 use crate::{cpu, kprint, kprintln};
@@ -66,15 +66,14 @@ pub fn rodar() -> ! {
                 shell.tecla(c);
             }
         }
-        // Liberar a memória dos programas de segundo plano que terminaram,
-        // e dar a CPU a eles enquanto ninguém digita (doc 12). Sem nenhum
-        // outro processo pronto, dormir até a próxima interrupção.
+        // Liberar a memória dos programas de segundo plano que terminaram
+        // (doc 12) e bloquear até chegar tecla ou terminar outro programa
+        // de segundo plano (doc 15). Enquanto isso, a CPU fica com os
+        // outros processos, ou com o ocioso.
         escalonador::recolher_segundo_plano();
-        if escalonador::ha_outros_prontos() {
-            escalonador::ceder();
-        } else {
-            teclado::esperar();
-        }
+        escalonador::esperar_ate(Motivo::Teclado, || {
+            teclado::tem_scancode() || escalonador::ha_terminados_em_segundo_plano()
+        });
     }
 }
 
@@ -344,14 +343,18 @@ fn elf(argumentos: &[&str]) {
 /// Comando `ps` (doc 12): a tabela de processos.
 fn ps(_: &[&str]) {
     use crate::escalonador::Estado;
-    kprintln!("  PID  ESTADO      CPU (tiques)  NOME");
+    use alloc::format;
+    kprintln!("  PID  ESTADO               CPU (tiques)  NOME");
     for (pid, nome, estado, tiques) in escalonador::listar() {
         let estado = match estado {
-            Estado::Pronto => "pronto",
-            Estado::Rodando => "rodando",
-            Estado::Terminado(_) => "terminado",
+            Estado::Pronto => format!("pronto"),
+            Estado::Rodando => format!("rodando"),
+            Estado::Bloqueado(Motivo::Dormindo { ate }) => format!("dormindo ate {}", ate),
+            Estado::Bloqueado(Motivo::Teclado) => format!("esperando tecla"),
+            Estado::Bloqueado(Motivo::Processo(p)) => format!("esperando pid {}", p),
+            Estado::Terminado(_) => format!("terminado"),
         };
-        kprintln!("  {:>3}  {:<10}  {:>12}  {}", pid, estado, tiques, nome);
+        kprintln!("  {:>3}  {:<19}  {:>12}  {}", pid, estado, tiques, nome);
     }
 }
 
