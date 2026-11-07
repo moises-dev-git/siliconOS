@@ -8,7 +8,8 @@
 //! função é uma chamada de sistema. Até o doc 13, pela instrução `int 0x80`
 //! (doc 10); desde o doc 14, pela instrução `syscall`, feita para isso.
 //! Desde o doc 16, também é quem lê os argumentos (argv) que o kernel deixa
-//! na pilha (docs/16-argumentos.md).
+//! na pilha (docs/16-argumentos.md), e desde o doc 17 abre e lê arquivos
+//! (docs/17-vfs-e-arquivos.md).
 
 #![no_std]
 
@@ -22,6 +23,9 @@ const SYS_ESCREVER: u64 = 1;
 const SYS_TIQUES: u64 = 2;
 const SYS_PID: u64 = 3;
 const SYS_DORMIR: u64 = 4;
+const SYS_ABRIR: u64 = 5;
+const SYS_LER: u64 = 6;
+const SYS_FECHAR: u64 = 7;
 
 /// Uma chamada de sistema com até dois argumentos, pela instrução
 /// `syscall` (doc 14). Número em RAX, argumentos em RDI e RSI, resultado em
@@ -29,9 +33,15 @@ const SYS_DORMIR: u64 = 4;
 /// compilador precisa saber que os dois mudam (`lateout(...) _`).
 #[inline(always)]
 fn chamada(numero: u64, a: u64, b: u64) -> u64 {
+    chamada3(numero, a, b, 0)
+}
+
+/// O mesmo, com um terceiro argumento em RDX (doc 17: `ler` precisa de três).
+#[inline(always)]
+fn chamada3(numero: u64, a: u64, b: u64, c: u64) -> u64 {
     let r: u64;
     unsafe {
-        asm!("syscall", inlateout("rax") numero => r, in("rdi") a, in("rsi") b,
+        asm!("syscall", inlateout("rax") numero => r, in("rdi") a, in("rsi") b, in("rdx") c,
              lateout("rcx") _, lateout("r11") _, options(nostack));
     }
     r
@@ -64,6 +74,77 @@ pub fn pid() -> u64 {
 /// tique (10 ms).
 pub fn dormir(ms: u64) {
     chamada(SYS_DORMIR, ms, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Arquivos (doc 17)
+// ---------------------------------------------------------------------------
+
+/// As syscalls de arquivo sem nenhuma ajuda: números crus, ponteiros crus.
+/// Os programas normais usam `Arquivo`; o `conferir` usa estas para
+/// mandar ao kernel o que um programa com defeito (ou malicioso) mandaria.
+pub mod cru {
+    use super::*;
+
+    /// Abre o caminho [ponteiro, ponteiro + tamanho). Descritor ou erro negativo.
+    pub fn abrir(ponteiro: u64, tamanho: u64) -> i64 {
+        chamada(SYS_ABRIR, ponteiro, tamanho) as i64
+    }
+
+    /// Lê até `tamanho` bytes para `destino`. Quantos leu (0 = fim) ou erro.
+    pub fn ler(descritor: u64, destino: u64, tamanho: u64) -> i64 {
+        chamada3(SYS_LER, descritor, destino, tamanho) as i64
+    }
+
+    /// Fecha o descritor. 0 ou erro.
+    pub fn fechar(descritor: u64) -> i64 {
+        chamada(SYS_FECHAR, descritor, 0) as i64
+    }
+}
+
+/// O texto de um código de erro do kernel (os mesmos números do Linux).
+pub fn nome_do_erro(codigo: i64) -> &'static str {
+    match codigo {
+        -2 => "nao existe",
+        -9 => "descritor nao esta aberto",
+        -14 => "endereco invalido",
+        -24 => "arquivos abertos demais",
+        -36 => "caminho grande demais",
+        -38 => "chamada desconhecida",
+        _ => "erro desconhecido",
+    }
+}
+
+/// Um arquivo aberto. Fecha sozinho quando sai de escopo (`Drop`), como um
+/// `File` do Rust ou um try-with-resources do Java.
+pub struct Arquivo {
+    descritor: u64,
+}
+
+impl Arquivo {
+    /// Abre o arquivo `caminho` ("/leiame.txt", "/sis/tempo"). O erro é o
+    /// código negativo do kernel (veja `nome_do_erro`).
+    pub fn abrir(caminho: &str) -> Result<Arquivo, i64> {
+        let r = cru::abrir(caminho.as_ptr() as u64, caminho.len() as u64);
+        if r < 0 { Err(r) } else { Ok(Arquivo { descritor: r as u64 }) }
+    }
+
+    /// Lê os próximos bytes para `destino`. `Ok(0)` = fim do arquivo.
+    pub fn ler(&mut self, destino: &mut [u8]) -> Result<usize, i64> {
+        let r = cru::ler(self.descritor, destino.as_mut_ptr() as u64, destino.len() as u64);
+        if r < 0 { Err(r) } else { Ok(r as usize) }
+    }
+
+    /// O número que o kernel deu a este arquivo.
+    pub fn descritor(&self) -> u64 {
+        self.descritor
+    }
+}
+
+impl Drop for Arquivo {
+    fn drop(&mut self) {
+        cru::fechar(self.descritor);
+    }
 }
 
 /// Destino de `print!`: cada pedaço de texto formatado vira um `escrever`.

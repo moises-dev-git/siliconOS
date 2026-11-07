@@ -40,7 +40,7 @@ kernel through *system calls* (syscalls).
 flowchart TB
     subgraph U["Ring 3: programs"]
         direction LR
-        P1["oi, primos, dados, medir<br/>(Rust + the sos library)"]
+        P1["oi, primos, cat, conferir...<br/>(Rust + the sos library)"]
         P2["ola, relogio, contador...<br/>(assembly, built in)"]
     end
 
@@ -48,7 +48,9 @@ flowchart TB
         direction TB
         SH["shell"] --> US["usuario (user)<br/>syscalls, programs, ELF"]
         US --> ESC["escalonador (scheduler)<br/>processes"]
-        US --> RD["ramdisk<br/>files (tar)"]
+        US --> VFS["vfs<br/>mounts, descriptors"]
+        SH --> VFS
+        VFS --> RD["ramdisk<br/>files (tar)"]
         US --> MEM["memoria (memory)<br/>frames, pages, heap"]
         ESC --> MEM
         INT["interrupcoes + idt<br/>timer, keyboard, exceptions"] --> ESC
@@ -123,13 +125,16 @@ other languages). The "Uses" column lists the modules it calls.
 
 | Module | Job | Uses | Doc |
 |---|---|---|---|
-| `escalonador.rs` (scheduler) | The process table and the **context switch**: decides who runs, switches the stack, CR3 and TSS.RSP0. Creates, terminates and reaps processes; blocks and wakes them; holds the idle process. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
+| `escalonador.rs` (scheduler) | The process table and the **context switch**: decides who runs, switches the stack, CR3 and TSS.RSP0. Creates, terminates and reaps processes; blocks and wakes them; holds the idle process. Keeps each process's table of open files. | `memoria`, `gdt`, `timer`, `usuario`, `vfs` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md), [17](17-vfs-e-arquivos.md) |
 | `usuario/mod.rs` (user) | Prepares a program (space, code, stack) and hands it to the scheduler. Handles the syscalls (`tratar_syscall`) and the programs' faults. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
 | `usuario/argumentos.rs` (arguments) | Builds a program's initial stack: argc, argv and the argument strings, in the System V format. | `memoria` | [16](16-argumentos.md) |
 | `usuario/syscall.rs` | The fast door into the kernel: configures the MSRs of the `syscall` instruction and holds the entry `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Reads ELF files (the executable format) and loads the segments into the program's space. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
 | `usuario/programas.rs` (programs) | The old programs, written in assembly and built into the kernel. | none | [10](10-modo-usuario.md) |
-| `ramdisk.rs` | The "disk": a tar file with the Rust programs, built into the kernel at compile time. | none | [13](13-disco-em-ram-e-elf.md) |
+| `ramdisk.rs` | The "disk": a tar file with the Rust programs (and texts), built into the kernel at compile time. | none | [13](13-disco-em-ram-e-elf.md) |
+| `vfs/mod.rs` | The virtual file system: the mount table (which system handles which path), the open files and the descriptor table. | `vfs/disco`, `vfs/sis` | [17](17-vfs-e-arquivos.md) |
+| `vfs/disco.rs` (disk) | The RAM disk as seen by the VFS, mounted at `/`. | `ramdisk` | [17](17-vfs-e-arquivos.md) |
+| `vfs/sis.rs` (sys) | `/sis`: files the kernel generates on the spot (time, memory, processes), like Linux's `/proc`. | `escalonador`, `timer`, `memoria` | [17](17-vfs-e-arquivos.md) |
 | `shell.rs` | The command interpreter: reads keys, builds the line and runs the command (`ajuda`, `rodar`, `ps`...). | almost all | [09](09-shell-e-testes.md) |
 
 And outside `src/`:
@@ -280,6 +285,42 @@ The syscalls that exist today:
 | 2 | `tiques` (ticks) | none | ticks since boot (100 per second) |
 | 3 | `pid` | none | the process number |
 | 4 | `dormir` (sleep) | milliseconds | 0, after sleeping (doc [15](15-dormir-e-bloqueio.md)) |
+| 5 | `abrir` (open) | path pointer and length | descriptor (3, 4...) or error (doc [17](17-vfs-e-arquivos.md)) |
+| 6 | `ler` (read) | descriptor, destination, length | bytes read, 0 at the end (or error) |
+| 7 | `fechar` (close) | descriptor | 0 (or error) |
+
+### 6.1 Opening and reading a file
+
+`cat` shows `/sis/tempo`. Three syscalls, and the VFS picks who handles the
+file by its path (doc [17](17-vfs-e-arquivos.md)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as cat<br/>(ring 3)
+    participant T as tratar_syscall
+    participant V as vfs
+    participant S as Sis<br/>(mounted at /sis)
+    participant D as the process's<br/>descriptors
+
+    P->>T: abrir("/sis/tempo")
+    Note over T: faixa_do_programa<br/>and copies the path
+    T->>V: vfs::abrir
+    V->>S: abrir("tempo")
+    S-->>V: text generated now
+    T->>D: guardar (store)
+    T-->>P: rax = 3
+    P->>T: ler(3, buf, 64)
+    T->>D: arquivo(3)
+    Note over T: faixa_gravavel<br/>_do_programa
+    T-->>P: rax = bytes read<br/>(0 = end)
+    P->>T: fechar(3)<br/>(Arquivo's Drop)
+    T->>D: fechar
+```
+
+The descriptor is just an index into the **process's** table: one program's
+3 has nothing to do with another's. And `ler` checks that the destination is
+**writable**: the kernel is going to write there.
 
 ---
 

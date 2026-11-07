@@ -81,10 +81,6 @@ pub fn abrir(nome: &str) -> Option<Arquivo<'static>> {
     arquivos().find(|a| a.nome == nome)
 }
 
-/// Tamanho do tar inteiro (para o comando `ls`).
-pub fn tamanho_total() -> usize {
-    RAMDISK.len()
-}
 
 #[cfg(test)]
 mod testes {
@@ -93,8 +89,9 @@ mod testes {
     #[test_case]
     fn os_programas_estao_no_disco() {
         let nomes: alloc::vec::Vec<&str> = arquivos().map(|a| a.nome).collect();
-        assert_eq!(nomes, ["args", "dados", "insone", "medir", "oi", "primos", "soneca"]);
-        assert!(arquivos().all(|a| a.dados.starts_with(b"\x7fELF")));
+        assert_eq!(nomes, ["args", "cat", "conferir", "dados", "insone", "leiame.txt", "medir", "oi", "primos", "soneca"]);
+        // Todos são executáveis, menos o texto (doc 17).
+        assert!(arquivos().all(|a| a.dados.starts_with(b"\x7fELF") == !a.nome.ends_with(".txt")));
         assert!(abrir("nao-existe").is_none());
     }
 

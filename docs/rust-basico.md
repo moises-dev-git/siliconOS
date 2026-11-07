@@ -1380,3 +1380,98 @@ precisa ser `pub` (a macro, expandida em outra crate, a chama), mas não é
 para os programas usarem. Os dois sublinhados no nome são a mesma
 convenção: "público por necessidade, não por convite".
 
+---
+
+## 47. `dyn Trait` em `static`, arrays de `Option`, `take` e `forget`
+
+Usado no doc 17 (`src/vfs/`, `programas/src/bin/conferir.rs`).
+
+**Objetos de trait numa tabela `static`.** A tabela de montagens guarda
+sistemas de arquivos de tipos diferentes (`Sis` e `Disco`) lado a lado:
+
+```rust
+struct Montagem {
+    caminho: &'static str,
+    sistema: &'static dyn SistemaDeArquivos,
+}
+
+static MONTAGENS: &[Montagem] = &[
+    Montagem { caminho: "/sis", sistema: &sis::Sis },
+    Montagem { caminho: "/", sistema: &disco::Disco },
+];
+```
+
+`&dyn SistemaDeArquivos` é uma referência "gorda" (§34): o endereço do valor
+mais o endereço da tabela de funções da trait para aquele tipo. É o que, em
+Java, toda referência a uma interface já é. `'static` diz que o valor vive
+para sempre; aqui, `Sis` e `Disco` são *structs* sem campos, e `&sis::Sis`
+é uma constante.
+
+Um `static` pode ser lido por qualquer código, a qualquer momento, inclusive
+de processos diferentes. Por isso o Rust exige que o que está dentro dele seja
+`Sync` ("pode ser compartilhado entre threads"). Com `dyn`, o compilador não
+sabe qual tipo está atrás da referência, então a exigência vai na própria
+trait: `pub trait SistemaDeArquivos: Sync` quer dizer "só implementa esta
+trait quem também é `Sync`".
+
+**Arrays de valores que não se copiam: `[const { None }; N]`.** A forma
+curta de criar um array, `[valor; N]`, copia `valor` N vezes, e por isso só
+funciona com tipos `Copy` (números, `bool`...). `Option<ArquivoAberto>` não
+é `Copy` (tem um `Vec` dentro). A saída é um bloco `const`: em vez de copiar
+um valor, o compilador avalia a expressão de novo para cada posição.
+
+```rust
+Descritores { abertos: [const { None }; MAX_ABERTOS] }
+```
+
+**`Option::take`: tirar e deixar vazio.** `opcao.take()` devolve o que estava
+dentro e deixa `None` no lugar, numa operação só. É o jeito de "tirar" um
+valor de dentro de uma estrutura que você só tem emprestada (`&mut`), sem
+precisar destruí-la:
+
+```rust
+self.abertos.get_mut(i as usize).and_then(|a| a.take()).is_some()
+```
+
+O valor tirado morre no fim da expressão (ninguém o guardou), e o `Drop`
+dele roda ali.
+
+**`find_map`: procurar e transformar de uma vez.** `iter.find_map(f)` chama
+`f` em cada elemento e para no primeiro que devolver `Some`, devolvendo esse
+valor. É um `find` cuja resposta já vem transformada. Dentro da closure, o `?`
+num `Option` (§24) devolve `None` cedo, e a busca passa para o próximo:
+
+```rust
+MONTAGENS.iter().find_map(|m| {
+    let resto = caminho.strip_prefix(base)?;   // não começa com base? próxima
+    ...
+})
+```
+
+**Devolver o valor de volta no erro.** `guardar` recebe o arquivo **por
+valor**: ele é movido para dentro da função (§8). Se a tabela está cheia,
+a função não tem onde pô-lo, e devolve-lo dentro do `Err` dá a quem chamou a
+chance de fazer outra coisa com ele:
+
+```rust
+pub fn guardar(&mut self, arquivo: ArquivoAberto) -> Result<u64, ArquivoAberto>
+```
+
+A biblioteca padrão faz o mesmo em vários lugares: o erro de
+`String::from_utf8` devolve os bytes (`into_bytes()`), e `Rc::try_unwrap`
+devolve o próprio `Rc` quando não consegue desembrulhá-lo.
+
+**`mem::forget`: não rodar o `Drop`.** `core::mem::forget(valor)` consome o
+valor sem destruí-lo: o `Drop` não roda. É seguro (não causa comportamento
+indefinido), mas quase sempre é um vazamento. O uso legítimo é quando o
+"trabalho do `Drop`" já foi feito por outro caminho, como no `conferir`,
+que fecha o descritor à mão e não quer que o `Arquivo` o feche de novo:
+
+```rust
+prova(f, "fechar o descritor", cru::fechar(d), 0);
+core::mem::forget(a); // já fechado à mão: o Drop não deve fechar de novo
+```
+
+**`bool as u64`.** Converter um `bool` em número dá 0 (`false`) ou 1
+(`true`). O `cat` usa isso para o código de saída: `falhou as u64`.
+

@@ -71,6 +71,7 @@ book and then the matching document.
 | [14: syscall and sysret](14-syscall-sysret.md) | The fast door into the kernel: STAR/LSTAR/FMASK MSRs, manual stack switch, cycle measurements | 11.4 | ✅ |
 | [15: Sleeping and blocked processes](15-dormir-e-bloqueio.md) | Blocked state, idle process, the `dormir` syscall, the lost wakeup | 11.4 | ✅ |
 | [16: Arguments for programs](16-argumentos.md) | argc/argv on the initial stack (System V format), naked `_start`, `rodar primos 5000` | 11.4 | ✅ |
+| [17: VFS and files](17-vfs-e-arquivos.md) | Mounts, descriptors, the `abrir`/`ler`/`fechar` syscalls, `/sis` generated on the spot, a `cat` in Rust | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 | [SiliconOS map](mapa.md) | System diagrams | — | ✅ |

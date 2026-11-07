@@ -104,7 +104,7 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "espacos", uso: "espacos", descricao: "dois espacos de enderecos, mesmo endereco, bytes diferentes", funcao: espacos },
     Comando { nome: "rodar", uso: "rodar <prog> [args]", descricao: "roda no anel 3; args: so os do disco; & no fim = 2o plano", funcao: rodar_programa },
     Comando { nome: "ps", uso: "ps", descricao: "lista os processos", funcao: ps },
-    Comando { nome: "ls", uso: "ls", descricao: "lista os arquivos do disco em RAM", funcao: ls },
+    Comando { nome: "ls", uso: "ls [diretorio]", descricao: "lista os arquivos (/ = disco em RAM, /sis = do kernel)", funcao: ls },
     Comando { nome: "elf", uso: "elf <arquivo>", descricao: "mostra o cabecalho e os segmentos de um ELF", funcao: elf },
     Comando { nome: "reiniciar", uso: "reiniciar", descricao: "reinicia a maquina", funcao: reiniciar },
     Comando { nome: "desligar", uso: "desligar", descricao: "desliga a maquina (ACPI; testado so no QEMU)", funcao: desligar },
@@ -317,15 +317,26 @@ fn rodar_programa(argumentos: &[&str]) {
     }
 }
 
-/// Comando `ls` (doc 13): os arquivos do disco em RAM.
-fn ls(_: &[&str]) {
-    let mut total = 0;
-    for a in crate::ramdisk::arquivos() {
-        let tipo = if a.dados.starts_with(b"\x7fELF") { "executavel ELF" } else { "" };
-        kprintln!("  {:<12}{:>8} bytes  {}", a.nome, a.dados.len(), tipo);
-        total += 1;
+/// Comando `ls [diretorio]` (doc 13; desde o doc 17, pelo VFS): o conteúdo
+/// de um diretório, "/" se nenhum for dado.
+fn ls(argumentos: &[&str]) {
+    let diretorio = argumentos.first().copied().unwrap_or("/");
+    let Some(itens) = crate::vfs::listar(diretorio) else {
+        kprintln!("'{}' nao e um diretorio (veja 'ls /')", diretorio);
+        return;
+    };
+    for (nome, tamanho) in &itens {
+        if nome.ends_with('/') {
+            kprintln!("  {:<12}{:>8}        diretorio", nome, "");
+            continue;
+        }
+        // Os primeiros bytes dizem o tipo: só o do disco pode ser ELF.
+        let caminho = alloc::format!("{}/{}", diretorio.trim_end_matches('/'), nome);
+        let mut inicio = [0u8; 4];
+        let elf = crate::vfs::abrir(&caminho).is_some_and(|mut a| a.ler(&mut inicio) == 4 && &inicio == b"\x7fELF");
+        kprintln!("  {:<12}{:>8} bytes  {}", nome, tamanho, if elf { "executavel ELF" } else { "" });
     }
-    kprintln!("{} arquivos; o disco em RAM (tar) ocupa {} bytes", total, crate::ramdisk::tamanho_total());
+    kprintln!("{} itens em {}", itens.len(), diretorio);
 }
 
 /// Comando `elf <arquivo>` (doc 13): o cabeçalho e os segmentos, como o

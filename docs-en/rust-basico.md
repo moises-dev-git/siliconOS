@@ -1392,3 +1392,100 @@ it has to be `pub` (the macro, expanded in another crate, calls it), but it
 is not meant for programs to use. The two leading underscores are the same
 convention: "public out of necessity, not by invitation".
 
+---
+
+## 47. `dyn Trait` in a `static`, arrays of `Option`, `take` and `forget`
+
+Used in doc 17 (`src/vfs/`, `programas/src/bin/conferir.rs`).
+
+**Trait objects in a `static` table.** The mount table stores file systems
+of different types (`Sis` and `Disco`) side by side:
+
+```rust
+struct Montagem {
+    caminho: &'static str,
+    sistema: &'static dyn SistemaDeArquivos,
+}
+
+static MONTAGENS: &[Montagem] = &[
+    Montagem { caminho: "/sis", sistema: &sis::Sis },
+    Montagem { caminho: "/", sistema: &disco::Disco },
+];
+```
+
+`&dyn SistemaDeArquivos` is a "fat" reference (§34): the value's address
+plus the address of the trait's function table for that type. It is what
+every reference to an interface already is in Java. `'static` says the value
+lives forever; here, `Sis` and `Disco` are *structs* with no fields, and
+`&sis::Sis` is a constant.
+
+A `static` can be read by any code, at any moment, including from different
+processes. That is why Rust requires what is inside it to be `Sync` ("can be
+shared between threads"). With `dyn`, the compiler does not know which type
+is behind the reference, so the requirement goes on the trait itself: `pub
+trait SistemaDeArquivos: Sync` means "only types that are also `Sync` may
+implement this trait".
+
+**Arrays of values that cannot be copied: `[const { None }; N]`.** The short
+way to build an array, `[value; N]`, copies `value` N times, and so only works
+with `Copy` types (numbers, `bool`...). `Option<ArquivoAberto>` is not `Copy`
+(it has a `Vec` inside). The way out is a `const` block: instead of copying a
+value, the compiler evaluates the expression again for each position.
+
+```rust
+Descritores { abertos: [const { None }; MAX_ABERTOS] }
+```
+
+**`Option::take`: take it out and leave it empty.** `option.take()` returns
+what was inside and leaves `None` in its place, in one operation. It is the
+way to "take" a value out of a structure you only have borrowed (`&mut`),
+without having to destroy it:
+
+```rust
+self.abertos.get_mut(i as usize).and_then(|a| a.take()).is_some()
+```
+
+The taken value dies at the end of the expression (nobody kept it), and its
+`Drop` runs there.
+
+**`find_map`: search and transform in one go.** `iter.find_map(f)` calls `f`
+on each element and stops at the first one that returns `Some`, returning
+that value. It is a `find` whose answer already comes transformed. Inside the
+closure, `?` on an `Option` (§24) returns `None` early, and the search moves
+on to the next one:
+
+```rust
+MONTAGENS.iter().find_map(|m| {
+    let resto = caminho.strip_prefix(base)?;   // does not start with base? next
+    ...
+})
+```
+
+**Handing the value back on error.** `guardar` receives the file **by
+value**: it is moved into the function (§8). If the table is full, the
+function has nowhere to put it, and returning it inside the `Err` gives the
+caller the chance to do something else with it:
+
+```rust
+pub fn guardar(&mut self, arquivo: ArquivoAberto) -> Result<u64, ArquivoAberto>
+```
+
+The standard library does the same in several places: `String::from_utf8`'s
+error returns the bytes (`into_bytes()`), and `Rc::try_unwrap` returns the
+`Rc` itself when it cannot unwrap it.
+
+**`mem::forget`: do not run `Drop`.** `core::mem::forget(value)` consumes the
+value without destroying it: `Drop` does not run. It is safe (it does not
+cause undefined behavior), but it is almost always a leak. The legitimate use
+is when "`Drop`'s job" has already been done some other way, as in
+`conferir`, which closes the descriptor by hand and does not want the
+`Arquivo` to close it again:
+
+```rust
+prova(f, "fechar o descritor", cru::fechar(d), 0);
+core::mem::forget(a); // already closed by hand: Drop must not close again
+```
+
+**`bool as u64`.** Converting a `bool` to a number gives 0 (`false`) or 1
+(`true`). `cat` uses this for its exit code: `falhou as u64`.
+

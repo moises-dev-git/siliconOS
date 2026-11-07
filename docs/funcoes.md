@@ -6,7 +6,7 @@ Todas as funções do kernel, agrupadas pelo arquivo onde moram e em ordem alfab
 
 Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir das tabelas "Funções deste capítulo" de cada capítulo, toda vez que o site é publicado. Quando uma função mudou num capítulo posterior, a frase diz "(desde o doc NN ...)"; o código atual está sempre em [`src/`](https://github.com/moises-dev-git/siliconOS/tree/main/src).
 
-294 funções e 67 testes (ou ajudantes de teste), de 17 capítulos.
+324 funções e 74 testes (ou ajudantes de teste), de 18 capítulos.
 
 ---
 
@@ -80,6 +80,7 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `acordar_em` | O mesmo que `acordar`, para quem já está com o lock da tabela (`encerrar`). | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `bloquear_e_trocar` | Marca o atual como `Bloqueado(motivo)` e troca de processo; volta quando o acordarem e chegar a vez dele. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `ceder` | Com as interrupções desligadas, escolhe o próximo e troca para ele; volta quando chegar de novo a vez deste. | [12](12-escalonador.md#funções-deste-capítulo) |
+| `com_arquivos` | Roda uma closure com a tabela de arquivos do processo atual, com o lock pego e as interrupções desligadas. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `criar` | Cria um processo com pilha do kernel fabricada (6 registradores, retorno para `primeira_entrada`, quadro de `iretq`) e o põe na tabela como `Pronto`. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `dormir` | Bloqueia o processo atual por pelo menos tantos tiques, sem gastar CPU. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `encerrar` | Marca o processo atual como `Terminado`, imprime o resultado se for de segundo plano e cede para nunca mais voltar. | [12](12-escalonador.md#funções-deste-capítulo) |
@@ -395,16 +396,21 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 
 | Função | O que faz | Doc |
 |---|---|---|
+| `abrir` (syscall) | Syscall 5: valida e copia o caminho, abre pelo VFS e devolve o descritor. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `descrever` | Texto curto do resultado de um programa ("terminou: codigo de saida 42"...). | [12](12-escalonador.md#funções-deste-capítulo) |
 | `dormir` (syscall) | Syscall 4: dorme `ms` milissegundos (arredondados para cima em tiques); devolve 0. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `encerrar` | Guarda o resultado e pula para `voltar_ao_kernel`; chamada de dentro de um tratador, nunca retorna. (Substituída no doc 12 por `escalonador::encerrar`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `entrada_syscall` | (naked) Tratador do vetor 0x80: empilha os registradores numa `Registros`, chama `tratar_syscall` e volta com `iretq`. | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `entrar_no_anel3` | (naked) Salva os registradores do kernel e o RSP, monta à mão um quadro de interrupção (SS, RSP, RFLAGS, CS, RIP do programa) e executa `iretq`. (Substituída no doc 12 pela pilha fabricada de `escalonador::criar` + `primeira_entrada`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `escrever` | A syscall `escrever`: valida o ponteiro, imprime os bytes e devolve quantos foram escritos (ou -14). | [10](10-modo-usuario.md#funções-deste-capítulo) |
+| `faixa_com_flags` | Toda página da faixa é do programa e tem os bits exigidos? | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `faixa_do_programa` | Confere se um ponteiro + tamanho vindo do programa está inteiro dentro das páginas dele (sem estouro de soma). | [10](10-modo-usuario.md#funções-deste-capítulo) |
+| `faixa_gravavel_do_programa` | Como `faixa_do_programa`, mas exige páginas graváveis (destino de uma cópia do kernel). | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `falha_do_programa` | Chamada pelos tratadores de exceção: se CS indica anel 3, imprime a falha e encerra o programa; senão retorna e o tratador dá panic. | [10](10-modo-usuario.md#funções-deste-capítulo) |
+| `fechar` (syscall) | Syscall 7: fecha o descritor. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `iniciar` | Prepara o espaço de endereços do programa (código e pilha) e o entrega ao escalonador; devolve o pid. | [12](12-escalonador.md#funções-deste-capítulo) |
 | `iniciar_elf` | Cria o espaço, carrega o ELF, mapeia 4 páginas de pilha no fim da metade baixa e entrega ao escalonador com RSP = topo − 8. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `ler` (syscall) | Syscall 6: copia os próximos bytes do arquivo para um destino gravável do programa. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `ms_para_tiques` | Milissegundos em tiques, arredondando para cima e sem estourar. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `nova_pagina_zerada` | Aloca um quadro e o zera (para o programa não ver lixo de quem usou o quadro antes). | [10](10-modo-usuario.md#funções-deste-capítulo) |
 | `rodar` | Mapeia código e pilha do programa com o bit USUARIO, entra no anel 3, e quando ele termina desmapeia tudo, libera os quadros e devolve o `Resultado`. (Desde o doc 11, num espaço de endereços próprio; desde o doc 12, é `iniciar` + `escalonador::esperar`.) | [10](10-modo-usuario.md#funções-deste-capítulo) |
@@ -426,6 +432,38 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 |---|---|---|
 | `entrada_syscall_rapida` | (naked) Troca para a pilha do kernel do processo, monta o mesmo quadro e os mesmos registradores do `int 0x80`, chama `tratar_syscall` e volta com `sysretq`. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
 | `init` | Escreve STAR (seletores), LSTAR (entrada), FMASK (IF, TF, DF) e liga o EFER.SCE. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
+
+### [src/vfs/disco.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/disco.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `Disco::abrir`, `Disco::listar` | O disco em RAM (tar) visto pelo VFS. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+
+### [src/vfs/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/mod.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `abrir` (VFS) | Abre um arquivo pelo caminho completo, repassando ao sistema de arquivos da montagem. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `ArquivoAberto::ler` | Copia os próximos bytes e avança a posição; 0 no fim. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `ArquivoAberto::restante` | Quantos bytes faltam ler. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Conteudo::bytes` | Os bytes do conteúdo, fixo (do tar) ou gerado. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Descritores::arquivo` | O arquivo de um descritor, se aberto; aceita qualquer número sem cair. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Descritores::fechar` | Fecha um descritor e libera o arquivo. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Descritores::guardar` | Guarda o arquivo no menor descritor livre (a partir de 3), ou o devolve se a tabela está cheia. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Descritores::novo` | Uma tabela de arquivos abertos vazia. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `Descritores::quantos` | Quantos arquivos estão abertos (usada nos testes). | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `listar` (VFS) | O conteúdo de um diretório, com as montagens de dentro dele como subdiretórios. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `pai` | O diretório que contém um caminho. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `procurar` | Acha a montagem que cuida de um caminho e o resto do caminho depois dela. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `SistemaDeArquivos::abrir` | (trait) Abre um arquivo pelo nome dentro da montagem e devolve o conteúdo. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `SistemaDeArquivos::listar` | (trait) Os arquivos da montagem, com o tamanho. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+
+### [src/vfs/sis.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/sis.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `Sis::abrir`, `Sis::listar` | Os arquivos de /sis, gerados na hora pela função de cada um. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `tempo`, `mem`, `processos` | Geram o texto de /sis/tempo, /sis/mem e /sis/processos. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 
 ---
 
@@ -450,6 +488,18 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | Função | O que faz | Doc |
 |---|---|---|
 | `main` (args) | Mostra argc e cada argumento com o endereço; sai com argc. | [16](16-argumentos.md#funções-deste-capítulo) |
+
+### [programas/src/bin/cat.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/cat.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `main`, `mostrar` (cat) | Mostra cada arquivo pedido, lendo aos pedaços de 64 bytes. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+
+### [programas/src/bin/conferir.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/conferir.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `main`, `prova` (conferir) | Manda pedidos de arquivo errados e confere cada resposta do kernel. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 
 ### [programas/src/bin/dados.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/dados.rs)
 
@@ -500,10 +550,15 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 | `_start` (macro `principal!`) | Ponto de entrada gerado pela macro: chama o `main` do programa e passa o resultado a `sair`. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `argumento` | O argumento `i` como `&'static str` (anda até o byte 0), ou `None` se não existe. | [16](16-argumentos.md#funções-deste-capítulo) |
 | `argumentos` | Iterador sobre todos os argumentos, como o `std::env::args()`. | [16](16-argumentos.md#funções-deste-capítulo) |
+| `Arquivo::abrir`, `Arquivo::ler`, `Arquivo::descritor` | Um arquivo aberto, com erros em `Result`. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `chamada` | Faz uma chamada de sistema por `syscall`, avisando o compilador que RCX e R11 mudam. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
+| `chamada3` | Uma syscall com três argumentos (RDI, RSI, RDX). | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `Console::write_str` | `fmt::Write`: cada pedaço de texto formatado vira um `escrever` (base de `print!`/`println!`). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `cru::abrir`, `cru::ler`, `cru::fechar` | As syscalls de arquivo com números e ponteiros crus. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `dormir` (sos) | Chama a syscall `dormir`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
+| `drop` (Arquivo) | Fecha o arquivo quando ele sai de escopo. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `escrever` | Chamada de sistema 1: escreve bytes no console e devolve quantos (ou um erro negativo). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `nome_do_erro` | O texto de um código de erro do kernel. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
 | `panic` | Tratador de panic dos programas: imprime a mensagem e sai com 101. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `pid` | Chamada de sistema 3: o número do processo. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `quantos_argumentos` | argc: quantos argumentos, contando o nome do programa. | [16](16-argumentos.md#funções-deste-capítulo) |
@@ -662,3 +717,15 @@ Os `#[test_case]` que rodam com `cargo test` (doc [09](09-shell-e-testes.md)), a
 |---|---|---|
 | `as_duas_portas_funcionam_no_mesmo_programa` | Teste: `medir` (que usa `int 0x80` e `syscall`) sai com 0. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
 | `msrs_configurados` | Teste: EFER.SCE ligado e STAR, LSTAR e FMASK com os valores esperados. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
+
+### src/vfs/mod.rs
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `abrir_e_ler_aos_pedacos` | Teste: ler de 7 em 7 bytes dá o arquivo inteiro e depois 0; diretório e inexistente não abrem. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `cat_le_do_disco_e_de_sis` | Teste: o `cat` sai com 0, 1 (arquivo que falta) ou 2 (sem argumentos). | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `descritores_reaproveitam_o_menor_livre` | Teste: 3 e 4, o 3 volta depois de fechado, números inválidos recusados, tabela cheia em 16. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `kernel_se_defende_e_libera_o_que_ficou_aberto` | Teste: o `conferir` passa em todas as provas, e os 16 arquivos que ele deixa abertos voltam para o heap. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `montagens_escolhidas_pelo_caminho` | Teste: cada caminho cai na montagem certa, inclusive `/sistema` (que não é de `/sis`). | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `raiz_mostra_a_montagem_sis` | Teste: `listar("/")` inclui `sis/` e `leiame.txt`; arquivo não é diretório. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |
+| `rodar_com` | Ajudante: roda um programa do disco com um argv e espera o resultado. | [17](17-vfs-e-arquivos.md#funções-deste-capítulo) |

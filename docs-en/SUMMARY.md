@@ -21,6 +21,7 @@
 - [14: syscall and sysret](14-syscall-sysret.md)
 - [15: Sleeping and blocking](15-dormir-e-bloqueio.md)
 - [16: Arguments (argv)](16-argumentos.md)
+- [17: VFS and files](17-vfs-e-arquivos.md)
 
 # Reference
 

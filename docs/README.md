@@ -62,6 +62,7 @@ do livro e depois o documento correspondente.
 | [14: syscall e sysret](14-syscall-sysret.md) | A porta rápida para o kernel: MSRs STAR/LSTAR/FMASK, troca de pilha manual, medição em ciclos | 11.4 | ✅ |
 | [15: Dormir e processos bloqueados](15-dormir-e-bloqueio.md) | Estado Bloqueado, processo ocioso, syscall `dormir`, o acordar perdido | 11.4 | ✅ |
 | [16: Argumentos para os programas](16-argumentos.md) | argc/argv na pilha inicial (formato System V), `_start` naked, `rodar primos 5000` | 11.4 | ✅ |
+| [17: VFS e arquivos](17-vfs-e-arquivos.md) | Montagens, descritores, syscalls `abrir`/`ler`/`fechar`, `/sis` gerado na hora, um `cat` em Rust | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 | [Mapa do SiliconOS](mapa.md) | Diagramas do sistema | — | ✅ |

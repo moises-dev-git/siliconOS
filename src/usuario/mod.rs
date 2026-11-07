@@ -49,10 +49,20 @@ pub const SYS_ESCREVER: u64 = 1;
 pub const SYS_TIQUES: u64 = 2;
 pub const SYS_PID: u64 = 3;
 pub const SYS_DORMIR: u64 = 4;
+pub const SYS_ABRIR: u64 = 5;   // doc 17
+pub const SYS_LER: u64 = 6;
+pub const SYS_FECHAR: u64 = 7;
 
 // Erros devolvidos em RAX, negativos como no Linux.
-pub const ERRO_ENDERECO: u64 = -14i64 as u64;  // EFAULT: ponteiro inválido
-pub const ERRO_SYSCALL: u64 = -38i64 as u64;   // ENOSYS: chamada desconhecida
+pub const ERRO_NAO_EXISTE: u64 = -2i64 as u64;      // ENOENT: arquivo não existe (doc 17)
+pub const ERRO_DESCRITOR: u64 = -9i64 as u64;       // EBADF: descritor não está aberto
+pub const ERRO_ENDERECO: u64 = -14i64 as u64;       // EFAULT: ponteiro inválido
+pub const ERRO_ABERTOS_DEMAIS: u64 = -24i64 as u64; // EMFILE: tabela de arquivos cheia
+pub const ERRO_NOME_LONGO: u64 = -36i64 as u64;     // ENAMETOOLONG: caminho grande demais
+pub const ERRO_SYSCALL: u64 = -38i64 as u64;        // ENOSYS: chamada desconhecida
+
+/// O maior caminho que `abrir` aceita, em bytes.
+pub const MAX_CAMINHO: u64 = 255;
 
 /// Como um programa terminou.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -214,6 +224,9 @@ extern "sysv64" fn tratar_syscall(r: &mut Registros) {
         SYS_TIQUES => timer::tiques(),
         SYS_PID => escalonador::pid_atual() as u64,
         SYS_DORMIR => dormir(r.rdi),
+        SYS_ABRIR => abrir(r.rdi, r.rsi),
+        SYS_LER => ler(r.rdi, r.rsi, r.rdx),
+        SYS_FECHAR => fechar(r.rdi),
         _ => ERRO_SYSCALL,
     };
 }
@@ -225,11 +238,25 @@ extern "sysv64" fn tratar_syscall(r: &mut Registros) {
 /// (o do programa que fez a chamada): cada página da faixa precisa estar
 /// mapeada, com o bit USUARIO, numa entrada da PML4 que é do programa.
 pub fn faixa_do_programa(inicio: u64, tamanho: u64) -> bool {
+    faixa_com_flags(inicio, tamanho, flags::USUARIO)
+}
+
+/// Como `faixa_do_programa`, mas exige também que o programa possa
+/// ESCREVER em cada página (doc 17): é para onde o kernel vai copiar dados.
+/// Com CR0.WP ligado (doc 06), o kernel que escreve numa página só de
+/// leitura leva um page fault, mesmo no anel 0.
+pub fn faixa_gravavel_do_programa(inicio: u64, tamanho: u64) -> bool {
+    faixa_com_flags(inicio, tamanho, flags::USUARIO | flags::ESCRITA)
+}
+
+/// Toda página de [inicio, inicio + tamanho) é do programa e tem todos os
+/// bits de `exigidas` ligados?
+fn faixa_com_flags(inicio: u64, tamanho: u64, exigidas: u64) -> bool {
     let Some(fim) = inicio.checked_add(tamanho) else { return false };
     let mut pagina = inicio & !(TAMANHO_QUADRO - 1);
     while pagina < fim {
         let do_programa = EspacoEnderecos::do_programa(pagina)
-            && paginacao::traduzir(pagina).is_some_and(|t| t.flags & flags::USUARIO != 0);
+            && paginacao::traduzir(pagina).is_some_and(|t| t.flags & exigidas == exigidas);
         if !do_programa {
             return false;
         }
@@ -249,6 +276,58 @@ fn dormir(ms: u64) -> u64 {
 /// dorme 1 tique (10 ms), nunca 0.
 fn ms_para_tiques(ms: u64) -> u64 {
     ms.saturating_mul(timer::FREQUENCIA_HZ).div_ceil(1000)
+}
+
+// ---------------------------------------------------------------------------
+// Arquivos (doc 17)
+// ---------------------------------------------------------------------------
+
+/// Syscall `abrir(caminho, tamanho)`: abre o arquivo e devolve o descritor
+/// (3, 4, ...), ou um erro negativo. O caminho vem como ponteiro e tamanho
+/// (um `&str` do Rust), não terminado em 0 como no Linux.
+fn abrir(ponteiro: u64, tamanho: u64) -> u64 {
+    if tamanho > MAX_CAMINHO {
+        return ERRO_NOME_LONGO;
+    }
+    if !faixa_do_programa(ponteiro, tamanho) {
+        return ERRO_ENDERECO;
+    }
+    // Copiar o caminho para o kernel antes de usar: a memória é do
+    // programa, e o kernel não deve trabalhar em cima dela.
+    let bytes = unsafe { core::slice::from_raw_parts(ponteiro as *const u8, tamanho as usize) };
+    let Ok(caminho) = core::str::from_utf8(bytes).map(String::from) else {
+        return ERRO_NAO_EXISTE; // nenhum arquivo tem um nome que não é UTF-8
+    };
+    // Abrir FORA do lock da tabela de processos: gerar /sis/processos
+    // consulta a tabela (escalonador::listar).
+    let Some(arquivo) = crate::vfs::abrir(&caminho) else {
+        return ERRO_NAO_EXISTE;
+    };
+    escalonador::com_arquivos(|d| d.guardar(arquivo)).unwrap_or(ERRO_ABERTOS_DEMAIS)
+    // (se a tabela estava cheia, `guardar` devolve o arquivo, que morre aqui)
+}
+
+/// Syscall `ler(descritor, destino, tamanho)`: copia até `tamanho` bytes
+/// do arquivo para `destino`, a partir de onde a leitura anterior parou.
+/// Devolve quantos copiou (0 = fim do arquivo), ou um erro negativo.
+fn ler(descritor: u64, destino: u64, tamanho: u64) -> u64 {
+    escalonador::com_arquivos(|d| {
+        let Some(arquivo) = d.arquivo(descritor) else { return ERRO_DESCRITOR };
+        // Só o que vai ser copiado de fato precisa ser conferido (e assim um
+        // `tamanho` enorme não faz a conferência andar por milhões de páginas).
+        let n = (tamanho as usize).min(arquivo.restante());
+        if !faixa_gravavel_do_programa(destino, n as u64) {
+            return ERRO_ENDERECO;
+        }
+        let destino = unsafe { core::slice::from_raw_parts_mut(destino as *mut u8, n) };
+        arquivo.ler(destino) as u64
+    })
+}
+
+/// Syscall `fechar(descritor)`: devolve 0, ou ERRO_DESCRITOR se ele não
+/// estava aberto.
+fn fechar(descritor: u64) -> u64 {
+    if escalonador::com_arquivos(|d| d.fechar(descritor)) { 0 } else { ERRO_DESCRITOR }
 }
 
 fn escrever(ponteiro: u64, tamanho: u64) -> u64 {

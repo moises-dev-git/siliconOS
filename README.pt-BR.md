@@ -34,6 +34,7 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Chamadas de sistema por `syscall`/`sysret` | `src/usuario/syscall.rs` | [14](docs/14-syscall-sysret.md) |
 | Processos bloqueados, processo ocioso e syscall `dormir` | `src/escalonador.rs` | [15](docs/15-dormir-e-bloqueio.md) |
 | Argumentos (argv) para os programas, no formato System V | `src/usuario/argumentos.rs`, `programas/src/lib.rs` | [16](docs/16-argumentos.md) |
+| VFS: montagens, descritores, `abrir`/`ler`/`fechar`, `/sis` | `src/vfs/` | [17](docs/17-vfs-e-arquivos.md) |
 
 ## Rodar
 

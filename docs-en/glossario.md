@@ -428,6 +428,31 @@ libc use it. SiliconOS does not provide it.
 The reader walks until it finds the 0 (`strlen`). The doc 16 arguments arrive
 like that; Rust's `&str`, on the other hand, stores the length.
 
+**VFS** (*virtual file system*)
+: The kernel layer that offers a single interface (paths; open, read, close)
+for files stored in different ways, and passes each request to the right
+file system (doc 17).
+
+**Mount**
+: Attaching a file system to a path in the tree: everything below `/sis` is
+handled by the `Sis` system. The mount table is what the VFS consults. On
+Linux, the `mount` command adds a line to it.
+
+**File descriptor** (`fd`)
+: The number `open` returns: an index into the process's table of open
+files. On Unix, 0, 1 and 2 are standard input, output and error; the first
+file opened gets 3 (doc 17).
+
+**Pseudo file system**
+: A file system whose files are not stored anywhere: the kernel generates
+the content when someone opens them. Linux's `/proc` and `/sys` work like
+that; so does SiliconOS's `/sis`.
+
+**errno** (error codes)
+: The negative numbers a syscall returns to say what went wrong: -2
+(ENOENT, does not exist), -9 (EBADF, invalid descriptor), -14 (EFAULT,
+invalid address)... SiliconOS uses the same numbers as Linux.
+
 **Position-independent code**
 : Machine code that works at any address, because it only uses addresses
 relative to the current instruction (`[rip + ...]`).

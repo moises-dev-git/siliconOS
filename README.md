@@ -38,6 +38,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | System calls through `syscall`/`sysret` | `src/usuario/syscall.rs` | [14](docs-en/14-syscall-sysret.md) |
 | Blocked processes, idle process and the `dormir` (sleep) syscall | `src/escalonador.rs` | [15](docs-en/15-dormir-e-bloqueio.md) |
 | Arguments (argv) for programs, in the System V format | `src/usuario/argumentos.rs`, `programas/src/lib.rs` | [16](docs-en/16-argumentos.md) |
+| VFS: mounts, descriptors, `abrir`/`ler`/`fechar` (open/read/close), `/sis` | `src/vfs/` | [17](docs-en/17-vfs-e-arquivos.md) |
 
 ## Running
 

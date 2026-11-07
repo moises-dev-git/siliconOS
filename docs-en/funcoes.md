@@ -6,7 +6,7 @@ Every kernel function, grouped by the file it lives in and sorted alphabetically
 
 This page is **generated automatically** (`site/indice_funcoes.py`) from the "Functions in this chapter" table of every chapter, each time the site is published. When a function changed in a later chapter, the sentence says "(since doc NN ...)"; the current code is always in [`src/`](https://github.com/moises-dev-git/siliconOS/tree/main/src).
 
-294 functions and 67 tests (or test helpers), from 17 chapters.
+324 functions and 74 tests (or test helpers), from 18 chapters.
 
 ---
 
@@ -80,6 +80,7 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `acordar_em` | The same as `acordar`, for code that already holds the table's lock (`encerrar`). | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `bloquear_e_trocar` | Marks the current process as `Bloqueado(motivo)` and switches processes; returns when it is woken up and its turn comes. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `ceder` | With interrupts off, picks the next process and switches to it; returns when this one's turn comes again. | [12](12-escalonador.md#functions-in-this-chapter) |
+| `com_arquivos` | Runs a closure with the current process's file table, with the lock held and interrupts off. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `criar` | Creates a process with a fabricated kernel stack (6 registers, return to `primeira_entrada`, an `iretq` frame) and puts it in the table as `Pronto`. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `dormir` | Blocks the current process for at least that many ticks, without using the CPU. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `encerrar` | Marks the current process `Terminado`, prints the result if it is a background one and yields never to return. | [12](12-escalonador.md#functions-in-this-chapter) |
@@ -395,16 +396,21 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 
 | Function | What it does | Doc |
 |---|---|---|
+| `abrir` (syscall) | Syscall 5: validates and copies the path, opens through the VFS and returns the descriptor. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `descrever` | Short text describing a program's result ("terminou: codigo de saida 42"...). | [12](12-escalonador.md#functions-in-this-chapter) |
 | `dormir` (syscall) | Syscall 4: sleeps `ms` milliseconds (rounded up to ticks); returns 0. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `encerrar` | Stores the result and jumps to `voltar_ao_kernel`; called from inside a handler, never returns. (Replaced in doc 12 by `escalonador::encerrar`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `entrada_syscall` | (naked) Vector 0x80 handler: pushes the registers into a `Registros`, calls `tratar_syscall` and returns with `iretq`. | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `entrar_no_anel3` | (naked) Saves the kernel's registers and RSP, builds an interrupt frame by hand (the program's SS, RSP, RFLAGS, CS, RIP) and runs `iretq`. (Replaced in doc 12 by the fabricated stack of `escalonador::criar` + `primeira_entrada`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `escrever` | The `escrever` syscall: validates the pointer, prints the bytes and returns how many were written (or -14). | [10](10-modo-usuario.md#functions-in-this-chapter) |
+| `faixa_com_flags` | Is every page in the range the program's, with the required bits? | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `faixa_do_programa` | Checks that a pointer + length from the program lies entirely within its pages (with no overflow in the addition). | [10](10-modo-usuario.md#functions-in-this-chapter) |
+| `faixa_gravavel_do_programa` | Like `faixa_do_programa`, but requires writable pages (the destination of a kernel copy). | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `falha_do_programa` | Called by the exception handlers: if CS says ring 3, prints the fault and kills the program; otherwise returns and the handler panics. | [10](10-modo-usuario.md#functions-in-this-chapter) |
+| `fechar` (syscall) | Syscall 7: closes the descriptor. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `iniciar` | Prepares the program's address space (code and stack) and hands it to the scheduler; returns the pid. | [12](12-escalonador.md#functions-in-this-chapter) |
 | `iniciar_elf` | Creates the space, loads the ELF, maps 4 stack pages at the end of the lower half and hands it to the scheduler with RSP = top − 8. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
+| `ler` (syscall) | Syscall 6: copies the file's next bytes to a writable destination in the program. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `ms_para_tiques` | Milliseconds to ticks, rounding up and without overflowing. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
 | `nova_pagina_zerada` | Allocates a frame and zeroes it (so the program does not see leftovers from the frame's previous user). | [10](10-modo-usuario.md#functions-in-this-chapter) |
 | `rodar` | Maps the program's code and stack with the USER bit, enters ring 3, and when it ends unmaps everything, frees the frames and returns the `Resultado`. (Since doc 11, in its own address space; since doc 12, it is `iniciar` + `escalonador::esperar`.) | [10](10-modo-usuario.md#functions-in-this-chapter) |
@@ -426,6 +432,38 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 |---|---|---|
 | `entrada_syscall_rapida` | (naked) Switches to the process's kernel stack, builds the same frame and registers as `int 0x80`, calls `tratar_syscall` and returns with `sysretq`. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
 | `init` | Writes STAR (selectors), LSTAR (entry), FMASK (IF, TF, DF) and sets EFER.SCE. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
+
+### [src/vfs/disco.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/disco.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `Disco::abrir`, `Disco::listar` | The RAM disk (tar) as seen by the VFS. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+
+### [src/vfs/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/mod.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `abrir` (VFS) | Opens a file by its full path, passing it to the mount's file system. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `ArquivoAberto::ler` | Copies the next bytes and advances the position; 0 at the end. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `ArquivoAberto::restante` | How many bytes are left to read. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Conteudo::bytes` | The content's bytes, fixed (from the tar) or generated. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Descritores::arquivo` | The file of a descriptor, if open; accepts any number without crashing. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Descritores::fechar` | Closes a descriptor and frees the file. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Descritores::guardar` | Stores the file under the lowest free descriptor (from 3), or hands it back if the table is full. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Descritores::novo` | An empty table of open files. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `Descritores::quantos` | How many files are open (used in the tests). | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `listar` (VFS) | A directory's contents, with the mounts inside it shown as subdirectories. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `pai` | The directory that contains a path. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `procurar` | Finds the mount responsible for a path and the rest of the path after it. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `SistemaDeArquivos::abrir` | (trait) Opens a file by its name inside the mount and returns the content. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `SistemaDeArquivos::listar` | (trait) The mount's files, with their sizes. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+
+### [src/vfs/sis.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/vfs/sis.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `Sis::abrir`, `Sis::listar` | The /sis files, generated on the spot by each one's function. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `tempo`, `mem`, `processos` | Generate the text of /sis/tempo, /sis/mem and /sis/processos. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 
 ---
 
@@ -450,6 +488,18 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | Function | What it does | Doc |
 |---|---|---|
 | `main` (args) | Shows argc and each argument with its address; exits with argc. | [16](16-argumentos.md#functions-in-this-chapter) |
+
+### [programas/src/bin/cat.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/cat.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `main`, `mostrar` (cat) | Shows each requested file, reading in 64-byte pieces. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+
+### [programas/src/bin/conferir.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/conferir.rs)
+
+| Function | What it does | Doc |
+|---|---|---|
+| `main`, `prova` (conferir) | Sends bad file requests and checks every answer from the kernel. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 
 ### [programas/src/bin/dados.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/dados.rs)
 
@@ -500,10 +550,15 @@ This page is **generated automatically** (`site/indice_funcoes.py`) from the "Fu
 | `_start` (macro `principal!`) | Entry point generated by the macro: calls the program's `main` and passes the result to `sair`. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `argumento` | Argument `i` as a `&'static str` (walks to the byte 0), or `None` if it does not exist. | [16](16-argumentos.md#functions-in-this-chapter) |
 | `argumentos` | Iterator over all the arguments, like `std::env::args()`. | [16](16-argumentos.md#functions-in-this-chapter) |
+| `Arquivo::abrir`, `Arquivo::ler`, `Arquivo::descritor` | An open file, with errors in a `Result`. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `chamada` | Makes a system call through `syscall`, telling the compiler RCX and R11 change. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
+| `chamada3` | A syscall with three arguments (RDI, RSI, RDX). | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `Console::write_str` | `fmt::Write`: each piece of formatted text becomes an `escrever` (the base of `print!`/`println!`). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
+| `cru::abrir`, `cru::ler`, `cru::fechar` | The file syscalls with raw numbers and pointers. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `dormir` (sos) | Calls the `dormir` syscall. | [15](15-dormir-e-bloqueio.md#functions-in-this-chapter) |
+| `drop` (Arquivo) | Closes the file when it goes out of scope. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `escrever` | System call 1: writes bytes to the console and returns how many (or a negative error). | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
+| `nome_do_erro` | The text of a kernel error code. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
 | `panic` | The programs' panic handler: prints the message and exits with 101. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `pid` | System call 3: the process number. | [13](13-disco-em-ram-e-elf.md#functions-in-this-chapter) |
 | `quantos_argumentos` | argc: how many arguments, counting the program's name. | [16](16-argumentos.md#functions-in-this-chapter) |
@@ -662,3 +717,15 @@ The `#[test_case]`s that run with `cargo test` (doc [09](09-shell-e-testes.md)),
 |---|---|---|
 | `as_duas_portas_funcionam_no_mesmo_programa` | Test: `medir` (which uses `int 0x80` and `syscall`) exits with 0. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
 | `msrs_configurados` | Test: EFER.SCE set and STAR, LSTAR and FMASK holding the expected values. | [14](14-syscall-sysret.md#functions-in-this-chapter) |
+
+### src/vfs/mod.rs
+
+| Function | What it does | Doc |
+|---|---|---|
+| `abrir_e_ler_aos_pedacos` | Test: reading 7 bytes at a time gives the whole file and then 0; a directory and a missing file do not open. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `cat_le_do_disco_e_de_sis` | Test: `cat` exits with 0, 1 (missing file) or 2 (no arguments). | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `descritores_reaproveitam_o_menor_livre` | Test: 3 and 4, 3 comes back after being closed, invalid numbers refused, table full at 16. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `kernel_se_defende_e_libera_o_que_ficou_aberto` | Test: `conferir` passes every test, and the 16 files it leaves open go back to the heap. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `montagens_escolhidas_pelo_caminho` | Test: each path lands in the right mount, including `/sistema` (which is not `/sis`'s). | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `raiz_mostra_a_montagem_sis` | Test: `listar("/")` includes `sis/` and `leiame.txt`; a file is not a directory. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |
+| `rodar_com` | Helper: runs a program from the disk with an argv and waits for the result. | [17](17-vfs-e-arquivos.md#functions-in-this-chapter) |

@@ -36,7 +36,7 @@ ao kernel por meio de *chamadas de sistema* (syscalls).
 flowchart TB
     subgraph U["Anel 3: programas"]
         direction LR
-        P1["oi, primos, dados, medir<br/>(Rust + biblioteca sos)"]
+        P1["oi, primos, cat, conferir...<br/>(Rust + biblioteca sos)"]
         P2["ola, relogio, contador...<br/>(assembly, embutidos)"]
     end
 
@@ -44,7 +44,9 @@ flowchart TB
         direction TB
         SH["shell"] --> US["usuario<br/>syscalls, programas, ELF"]
         US --> ESC["escalonador<br/>processos"]
-        US --> RD["ramdisk<br/>arquivos (tar)"]
+        US --> VFS["vfs<br/>montagens, descritores"]
+        SH --> VFS
+        VFS --> RD["ramdisk<br/>arquivos (tar)"]
         US --> MEM["memoria<br/>quadros, páginas, heap"]
         ESC --> MEM
         INT["interrupcoes + idt<br/>timer, teclado, exceções"] --> ESC
@@ -119,13 +121,16 @@ em outras linguagens). A coluna "Usa" lista os módulos que ele chama.
 
 | Módulo | Trabalho | Usa | Doc |
 |---|---|---|---|
-| `escalonador.rs` | A tabela de processos e a **troca de contexto**: decide quem roda, troca de pilha, de CR3 e de TSS.RSP0. Cria, encerra e recolhe processos; bloqueia e acorda; tem o processo ocioso. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
+| `escalonador.rs` | A tabela de processos e a **troca de contexto**: decide quem roda, troca de pilha, de CR3 e de TSS.RSP0. Cria, encerra e recolhe processos; bloqueia e acorda; tem o processo ocioso. Guarda a tabela de arquivos abertos de cada processo. | `memoria`, `gdt`, `timer`, `usuario`, `vfs` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md), [17](17-vfs-e-arquivos.md) |
 | `usuario/mod.rs` | Prepara um programa (espaço, código, pilha) e o entrega ao escalonador. Trata as syscalls (`tratar_syscall`) e as falhas dos programas. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
 | `usuario/argumentos.rs` | Monta a pilha inicial de um programa: argc, argv e os textos dos argumentos, no formato System V. | `memoria` | [16](16-argumentos.md) |
 | `usuario/syscall.rs` | A porta rápida para o kernel: configura os MSRs da instrução `syscall` e tem a entrada `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Lê arquivos ELF (o formato dos executáveis) e carrega os segmentos no espaço do programa. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
 | `usuario/programas.rs` | Os programas antigos, escritos em assembly e embutidos no kernel. | nenhum | [10](10-modo-usuario.md) |
-| `ramdisk.rs` | O "disco": um arquivo tar com os programas em Rust, embutido no kernel na compilação. | nenhum | [13](13-disco-em-ram-e-elf.md) |
+| `ramdisk.rs` | O "disco": um arquivo tar com os programas em Rust (e textos), embutido no kernel na compilação. | nenhum | [13](13-disco-em-ram-e-elf.md) |
+| `vfs/mod.rs` | O sistema de arquivos virtual: a tabela de montagens (que sistema cuida de qual caminho), os arquivos abertos e a tabela de descritores. | `vfs/disco`, `vfs/sis` | [17](17-vfs-e-arquivos.md) |
+| `vfs/disco.rs` | O disco em RAM visto pelo VFS, montado em `/`. | `ramdisk` | [17](17-vfs-e-arquivos.md) |
+| `vfs/sis.rs` | `/sis`: arquivos que o kernel gera na hora (tempo, memória, processos), como o `/proc` do Linux. | `escalonador`, `timer`, `memoria` | [17](17-vfs-e-arquivos.md) |
 | `shell.rs` | O interpretador de comandos: lê teclas, monta a linha e executa o comando (`ajuda`, `rodar`, `ps`...). | quase todos | [09](09-shell-e-testes.md) |
 
 E fora de `src/`:
@@ -277,6 +282,42 @@ As syscalls que existem hoje:
 | 2 | `tiques` | nenhum | tiques desde o boot (100 por segundo) |
 | 3 | `pid` | nenhum | o número do processo |
 | 4 | `dormir` | milissegundos | 0, depois de dormir (doc [15](15-dormir-e-bloqueio.md)) |
+| 5 | `abrir` | ponteiro e tamanho do caminho | descritor (3, 4...) ou erro (doc [17](17-vfs-e-arquivos.md)) |
+| 6 | `ler` | descritor, destino, tamanho | bytes lidos, 0 no fim (ou erro) |
+| 7 | `fechar` | descritor | 0 (ou erro) |
+
+### 6.1 Abrir e ler um arquivo
+
+O `cat` mostra `/sis/tempo`. Três syscalls, e o VFS escolhe quem cuida do
+arquivo pelo caminho (doc [17](17-vfs-e-arquivos.md)):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as cat<br/>(anel 3)
+    participant T as tratar_syscall
+    participant V as vfs
+    participant S as Sis<br/>(montado em /sis)
+    participant D as descritores<br/>do processo
+
+    P->>T: abrir("/sis/tempo")
+    Note over T: faixa_do_programa<br/>e copia o caminho
+    T->>V: vfs::abrir
+    V->>S: abrir("tempo")
+    S-->>V: texto gerado agora
+    T->>D: guardar
+    T-->>P: rax = 3
+    P->>T: ler(3, buf, 64)
+    T->>D: arquivo(3)
+    Note over T: faixa_gravavel<br/>_do_programa
+    T-->>P: rax = bytes lidos<br/>(0 = fim)
+    P->>T: fechar(3)<br/>(Drop do Arquivo)
+    T->>D: fechar
+```
+
+O descritor é só um índice na tabela **do processo**: o 3 de um programa não
+tem nada a ver com o 3 de outro. E `ler` confere que o destino é **gravável**:
+o kernel vai escrever ali.
 
 ---
 

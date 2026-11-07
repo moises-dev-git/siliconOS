@@ -3,7 +3,8 @@
 //!
 //!   1. compila os programas de usuário (pasta `programas/`) para o alvo
 //!      x86_64-unknown-none, gerando um executável ELF para cada um;
-//!   2. empacota os ELF num arquivo tar (o "disco em RAM");
+//!   2. empacota os ELF num arquivo tar (o "disco em RAM"), junto com os
+//!      arquivos comuns de `programas/arquivos/` (desde o doc 17);
 //!   3. deixa o tar em OUT_DIR, de onde o kernel o embute com include_bytes!.
 
 use std::env;
@@ -20,6 +21,7 @@ fn main() {
     let alvo_dir = raiz.join("target").join("programas");
 
     println!("cargo:rerun-if-changed=programas/src");
+    println!("cargo:rerun-if-changed=programas/arquivos");
     println!("cargo:rerun-if-changed=programas/linker.ld");
     println!("cargo:rerun-if-changed=programas/Cargo.toml");
     println!("cargo:rerun-if-changed=programas/.cargo/config.toml");
@@ -48,10 +50,20 @@ fn main() {
     nomes.sort();
 
     let binarios = alvo_dir.join("x86_64-unknown-none").join("release");
+    let mut conteudo: Vec<(String, Vec<u8>)> = nomes.iter()
+        .map(|nome| (nome.clone(), fs::read(binarios.join(nome)).unwrap()))
+        .collect();
+    // Desde o doc 17: os arquivos comuns (texto) de programas/arquivos,
+    // copiados como estão.
+    for entrada in fs::read_dir(programas.join("arquivos")).unwrap() {
+        let caminho = entrada.unwrap().path();
+        let nome = caminho.file_name().unwrap().to_string_lossy().into_owned();
+        conteudo.push((nome, fs::read(&caminho).unwrap()));
+    }
+    conteudo.sort();
     let mut tar = Vec::new();
-    for nome in &nomes {
-        let dados = fs::read(binarios.join(nome)).unwrap();
-        acrescentar_ao_tar(&mut tar, nome, &dados);
+    for (nome, dados) in &conteudo {
+        acrescentar_ao_tar(&mut tar, nome, dados);
     }
     // O fim de um tar: dois blocos de 512 bytes zerados.
     tar.extend_from_slice(&[0u8; 1024]);

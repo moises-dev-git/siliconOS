@@ -1,0 +1,12 @@
+Este arquivo mora no disco em RAM do SiliconOS.
+
+Ele nao e um programa: e texto puro, empacotado no tar pelo build.rs junto
+com os executaveis (docs/17-vfs-e-arquivos.md). Um programa o le com as
+chamadas de sistema abrir, ler e fechar, por exemplo:
+
+    rodar cat /leiame.txt
+
+Experimente tambem os arquivos de /sis, que o kernel escreve na hora em
+que alguem os abre:
+
+    rodar cat /sis/tempo /sis/mem /sis/processos

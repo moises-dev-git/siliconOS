@@ -424,6 +424,31 @@ carregador dinâmico e a libc a usam. O SiliconOS não a entrega.
 guardado. Quem lê anda até achar o 0 (`strlen`). Os argumentos do doc 16
 chegam assim; o `&str` do Rust, ao contrário, guarda o tamanho.
 
+**VFS** (*virtual file system*, sistema de arquivos virtual)
+: A camada do kernel que oferece uma interface só (caminhos; abrir, ler,
+fechar) para arquivos guardados de jeitos diferentes, e repassa cada pedido
+ao sistema de arquivos certo (doc 17).
+
+**Montagem** (*mount*)
+: Ligar um sistema de arquivos a um caminho da árvore: tudo abaixo de
+`/sis` é com o sistema `Sis`. A tabela de montagens é o que o VFS consulta.
+No Linux, o comando `mount` acrescenta uma linha a ela.
+
+**Descritor de arquivo** (*file descriptor*, `fd`)
+: O número que `abrir` devolve: um índice na tabela de arquivos abertos do
+processo. 0, 1 e 2 são, no Unix, a entrada, a saída e a saída de erros
+padrão; o primeiro arquivo aberto ganha o 3 (doc 17).
+
+**Pseudo-sistema de arquivos**
+: Um sistema de arquivos cujos arquivos não estão guardados em lugar nenhum:
+o kernel gera o conteúdo quando alguém os abre. O `/proc` e o `/sys` do Linux
+são assim; o `/sis` do SiliconOS também.
+
+**errno** (códigos de erro)
+: Os números negativos que uma syscall devolve para dizer o que deu errado:
+-2 (ENOENT, não existe), -9 (EBADF, descritor inválido), -14 (EFAULT,
+endereço inválido)... O SiliconOS usa os mesmos números do Linux.
+
 **Código independente de posição**
 : Código de máquina que funciona em qualquer endereço, porque só usa
 endereços relativos à instrução atual (`[rip + ...]`).

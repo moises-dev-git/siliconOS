@@ -73,8 +73,9 @@ first isolated programs, in user mode, doc 11 gives each program its
 own address space, doc 12 runs several of them at once, with a
 scheduler, doc 13 loads them from ELF files written in Rust, doc 14 switches the
 door into the kernel to `syscall`/`sysret`, doc 15 lets a process wait (sleep,
-or wait for a key) without using the CPU, and doc 16 passes arguments to programs
-(`rodar primos 5000`).
+or wait for a key) without using the CPU, doc 16 passes arguments to programs
+(`rodar primos 5000`), and doc 17 lets programs open and read files, through a
+virtual file system.
 
 ---
 

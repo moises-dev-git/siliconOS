@@ -35,6 +35,7 @@ use crate::kprintln;
 use crate::memoria::espaco::EspacoEnderecos;
 use crate::memoria::paginacao;
 use crate::usuario::{self, Resultado};
+use crate::vfs::Descritores;
 
 pub type Pid = u32;
 
@@ -83,6 +84,9 @@ pub struct Processo {
     pub tiques_cpu: u64,
     /// Ninguém espera por ele: o resultado é impresso ao terminar.
     pub segundo_plano: bool,
+    /// Os arquivos abertos (doc 17). Morre com o processo: o que ficou
+    /// aberto é liberado quando ele é recolhido.
+    arquivos: Descritores,
 }
 
 impl Processo {
@@ -119,10 +123,12 @@ pub fn init() {
         t.processos.push(Box::new(Processo {
             pid: 0, nome: "kernel", estado: Estado::Rodando, rsp: 0,
             pilha: None, espaco: None, tiques_cpu: 0, segundo_plano: false,
+            arquivos: Descritores::novo(),
         }));
         t.processos.push(Box::new(Processo {
             pid: 1, nome: "ocioso", estado: Estado::Pronto, rsp: rsp_ocioso,
             pilha: Some(pilha), espaco: None, tiques_cpu: 0, segundo_plano: false,
+            arquivos: Descritores::novo(),
         }));
         t.proximo_pid = 2;
     });
@@ -180,6 +186,7 @@ pub fn criar(nome: &'static str, espaco: EspacoEnderecos, rip: u64, rsp: u64, se
         t.processos.push(Box::new(Processo {
             pid, nome, estado: Estado::Pronto, rsp: rsp_kernel,
             pilha: Some(pilha), espaco: Some(espaco), tiques_cpu: 0, segundo_plano,
+            arquivos: Descritores::novo(),
         }));
         pid
     })
@@ -471,6 +478,17 @@ pub fn pid_atual() -> Pid {
     cpu::sem_interrupcoes(|| {
         let t = TABELA.lock();
         t.processos.get(t.atual).map_or(0, |p| p.pid)
+    })
+}
+
+/// Roda `f` com a tabela de arquivos abertos do processo atual (doc 17),
+/// com as interrupções desligadas e o lock da tabela pego: `f` deve ser
+/// curta e não pode chamar nada que pegue o lock de novo (como `listar`).
+pub fn com_arquivos<R>(f: impl FnOnce(&mut Descritores) -> R) -> R {
+    cpu::sem_interrupcoes(|| {
+        let mut t = TABELA.lock();
+        let a = t.atual;
+        f(&mut t.processos[a].arquivos)
     })
 }
 

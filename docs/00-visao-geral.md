@@ -76,8 +76,9 @@ programa o seu próprio espaço de endereços, o doc 12 faz vários deles
 rodarem ao mesmo tempo, com um escalonador, o doc 13 os carrega de
 arquivos ELF, escritos em Rust, o doc 14 troca a porta de entrada no kernel
 por `syscall`/`sysret`, o doc 15 deixa um processo esperar (dormir, ou
-esperar uma tecla) sem gastar a CPU, e o doc 16 entrega argumentos aos
-programas (`rodar primos 5000`).
+esperar uma tecla) sem gastar a CPU, o doc 16 entrega argumentos aos
+programas (`rodar primos 5000`), e o doc 17 deixa os programas abrirem e
+lerem arquivos, por um sistema de arquivos virtual.
 
 ---
 
