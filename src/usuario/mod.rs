@@ -17,6 +17,7 @@
 //! `escalonador::encerrar`: a chamada `sair`, uma exceção da CPU no anel 3,
 //! ou o timer (tempo de CPU esgotado).
 
+pub mod elf;
 pub mod programas;
 
 use alloc::format;
@@ -101,7 +102,38 @@ pub fn iniciar(programa: &programas::Programa, segundo_plano: bool) -> Pid {
     escalonador::criar(programa.nome, espaco, CODIGO_VIRT, PILHA_VIRT + TAMANHO_QUADRO, segundo_plano)
 }
 
-/// Roda o programa e espera ele terminar (o que o shell faz sem `&`).
+/// Topo da pilha dos programas ELF (doc 13): fim da entrada 255 da PML4, o
+/// último endereço da metade baixa, longe de onde os segmentos moram.
+pub const PILHA_ELF_TOPO: u64 = 0x0000_8000_0000_0000;
+/// Quantas páginas de pilha um programa ELF ganha (16 KiB).
+pub const PILHA_ELF_PAGINAS: u64 = 4;
+
+/// Carrega um executável ELF (doc 13) num espaço de endereços próprio,
+/// com uma pilha de PILHA_ELF_PAGINAS páginas, e o entrega ao escalonador.
+pub fn iniciar_elf(nome: &'static str, dados: &[u8], segundo_plano: bool) -> Result<Pid, elf::ErroElf> {
+    let mut espaco = EspacoEnderecos::novo().ok_or(elf::ErroElf::SemMemoria)?;
+    // Se der erro daqui em diante, `espaco` é destruído na saída (`?`) e
+    // devolve tudo o que já tinha sido mapeado.
+    let entrada = elf::carregar(dados, &mut espaco)?;
+    for i in 1..=PILHA_ELF_PAGINAS {
+        let q = quadros::alocar().ok_or(elf::ErroElf::SemMemoria)?;
+        unsafe { core::ptr::write_bytes(paginacao::fisico_para_virtual(q.endereco()) as *mut u8, 0, 4096) };
+        espaco.mapear(PILHA_ELF_TOPO - i * TAMANHO_QUADRO, q,
+                      flags::USUARIO | flags::ESCRITA | flags::SEM_EXECUCAO)
+            .map_err(|_| elf::ErroElf::SemMemoria)?;
+    }
+    // RSP = topo - 8: o compilador gera `_start` como uma função comum, que
+    // espera ter sido chamada com `call` (que empilha 8 bytes de endereço de
+    // retorno numa pilha alinhada em 16). Com a pilha desalinhada, uma
+    // instrução que exige alinhamento (como `movaps`) daria #GP. Os três
+    // programas de hoje rodaram mesmo com RSP = topo (testado): só não usam
+    // nenhuma dessas. O erro ficaria escondido até o primeiro que usasse.
+    Ok(escalonador::criar(nome, espaco, entrada, PILHA_ELF_TOPO - 8, segundo_plano))
+}
+
+/// Roda o programa e espera ele terminar. Desde o doc 13, o shell faz o
+/// mesmo à mão (para também aceitar arquivos ELF); quem usa esta são os testes.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn rodar(programa: &programas::Programa) -> Resultado {
     let pid = iniciar(programa, false);
     escalonador::esperar(pid)
@@ -167,11 +199,24 @@ extern "sysv64" fn tratar_syscall(r: &mut Registros) {
     };
 }
 
-/// O ponteiro [inicio, inicio + tamanho) está inteiro dentro de uma página
-/// do programa? Nunca confiar num ponteiro vindo do anel 3.
+/// O ponteiro [inicio, inicio + tamanho) aponta só para memória do
+/// programa? Nunca confiar num ponteiro vindo do anel 3.
+///
+/// Desde o doc 13, a pergunta é feita às tabelas de página do espaço ativo
+/// (o do programa que fez a chamada): cada página da faixa precisa estar
+/// mapeada, com o bit USUARIO, numa entrada da PML4 que é do programa.
 pub fn faixa_do_programa(inicio: u64, tamanho: u64) -> bool {
     let Some(fim) = inicio.checked_add(tamanho) else { return false };
-    [CODIGO_VIRT, PILHA_VIRT].iter().any(|&p| inicio >= p && fim <= p + TAMANHO_QUADRO)
+    let mut pagina = inicio & !(TAMANHO_QUADRO - 1);
+    while pagina < fim {
+        let do_programa = EspacoEnderecos::do_programa(pagina)
+            && paginacao::traduzir(pagina).is_some_and(|t| t.flags & flags::USUARIO != 0);
+        if !do_programa {
+            return false;
+        }
+        pagina += TAMANHO_QUADRO;
+    }
+    true
 }
 
 fn escrever(ponteiro: u64, tamanho: u64) -> u64 {
@@ -241,10 +286,21 @@ mod testes {
 
     #[test_case]
     fn validacao_de_ponteiros() {
-        assert!(faixa_do_programa(CODIGO_VIRT, 10));
-        assert!(faixa_do_programa(PILHA_VIRT + 4000, 96));
-        assert!(!faixa_do_programa(PILHA_VIRT + 4000, 97));          // passa do fim
-        assert!(!faixa_do_programa(0xFFFF_9000_0000_0000, 16));     // kernel
-        assert!(!faixa_do_programa(u64::MAX - 4, 10));               // estoura
+        // As perguntas são feitas às tabelas do espaço ATIVO: montar um
+        // espaço com as duas páginas de sempre e ativá-lo durante o teste.
+        let mut espaco = EspacoEnderecos::novo().unwrap();
+        espaco.mapear(CODIGO_VIRT, nova_pagina_zerada(), flags::USUARIO).unwrap();
+        espaco.mapear(PILHA_VIRT, nova_pagina_zerada(), flags::USUARIO | flags::ESCRITA).unwrap();
+        espaco.ativar();
+        let respostas = [
+            faixa_do_programa(CODIGO_VIRT, 10),
+            faixa_do_programa(PILHA_VIRT + 4000, 96),
+            faixa_do_programa(PILHA_VIRT + 4000, 97),          // passa do fim
+            faixa_do_programa(CODIGO_VIRT + 4090, 10),         // a página seguinte não existe
+            faixa_do_programa(0xFFFF_9000_0000_0000, 16),      // kernel
+            faixa_do_programa(u64::MAX - 4, 10),               // estoura
+        ];
+        paginacao::ativar(paginacao::raiz_kernel());
+        assert_eq!(respostas, [true, true, false, false, false, false]);
     }
 }

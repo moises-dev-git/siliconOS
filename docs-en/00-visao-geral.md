@@ -70,8 +70,8 @@ SiliconOS has finished steps 1 to 5: memory (docs 05 to 07), hardware
 interrupts, with the timer and the keyboard (doc 08), and an interactive
 shell with automated tests (doc 09). Step 6 has begun: doc 10 runs the
 first isolated programs, in user mode, doc 11 gives each program its
-own address space, and doc 12 runs several of them at once, with a
-scheduler.
+own address space, doc 12 runs several of them at once, with a
+scheduler, and doc 13 loads them from ELF files written in Rust.
 
 ---
 

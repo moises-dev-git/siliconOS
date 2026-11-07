@@ -1,0 +1,14 @@
+# Como compilar os programas de usuário (o build.rs do kernel usa este arquivo).
+[build]
+target = "x86_64-unknown-none"
+
+[target.x86_64-unknown-none]
+rustflags = [
+    # Endereços fixos, escolhidos pelo nosso script de ligação (sem PIE,
+    # sem relocações para o kernel aplicar).
+    "-C", "link-arg=-Tlinker.ld",
+    "-C", "relocation-model=static",
+    # O programa mora acima de 2 GiB (0x2000_0000_0000): o modelo "small"
+    # só alcança endereços absolutos de 32 bits.
+    "-C", "code-model=large",
+]

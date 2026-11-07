@@ -1,0 +1,22 @@
+# Programas de usuário do SiliconOS, em Rust (docs/13-disco-em-ram-e-elf.md).
+# Compilados para x86_64-unknown-none (sem sistema operacional) pelo build.rs
+# do kernel, empacotados num arquivo tar e embutidos no kernel.
+[package]
+name = "programas"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+# Um workspace próprio: este crate não faz parte do crate do kernel.
+[workspace]
+
+[lib]
+name = "sos"            # a "biblioteca do sistema" que os programas usam
+path = "src/lib.rs"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"         # programas pequenos

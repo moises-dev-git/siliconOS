@@ -54,6 +54,7 @@ do livro e depois o documento correspondente.
 | [10: Modo usuário](10-modo-usuario.md) | Anel 3, `iretq`, chamadas de sistema (`int 0x80`), programas isolados | 11.4 | ✅ |
 | [11: Espaços de endereços](11-espacos-de-enderecos.md) | Uma PML4 por programa, kernel compartilhado, troca de CR3, `Drop` que devolve os quadros | 11.4 | ✅ |
 | [12: O escalonador](12-escalonador.md) | Processos, troca de contexto, pilha do kernel por processo, preempção pelo timer, `ps` e `&` | 11.4 | ✅ |
+| [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md) | Programas de usuário em Rust, script de ligação, formato tar, carregador de ELF | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 
@@ -64,10 +65,11 @@ do livro e depois o documento correspondente.
 Pré-requisitos:
 
 - **Rust nightly** com o alvo `x86_64-unknown-uefi` (o compilador gera um
-  executável no formato que o UEFI entende):
+  executável no formato que o UEFI entende) e, desde o doc 13, o alvo
+  `x86_64-unknown-none` (para os programas de usuário em Rust):
   ```bash
   rustup toolchain install nightly
-  rustup target add x86_64-unknown-uefi --toolchain nightly
+  rustup target add x86_64-unknown-uefi x86_64-unknown-none --toolchain nightly
   ```
 - **QEMU** (`qemu-system-x86_64`), o emulador de PC;
 - **OVMF**, o firmware UEFI que o QEMU usa. No Ubuntu/Debian, os dois vêm

@@ -1072,3 +1072,127 @@ os atômicos (`AtomicU64`), e o próprio `spin::Mutex` ([§11](#11-mutex-e-once-
 Em Java, o equivalente aproximado seria um campo `volatile` que vários
 objetos leem e um só escreve; a diferença é que em Rust a necessidade tem
 que ser declarada no tipo.
+
+## 40. `build.rs` e `include_bytes!`: trabalho feito na compilação
+
+```rust
+// build.rs, na raiz do crate
+fn main() {
+    println!("cargo:rerun-if-changed=programas/src");
+    // ... compila os programas, monta o tar em OUT_DIR ...
+}
+
+// src/ramdisk.rs
+static RAMDISK: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ramdisk.tar"));
+```
+
+Um arquivo `build.rs` na raiz de um crate é um **script de build**: um
+programa Rust comum (com `std`, rodando no seu computador) que o cargo
+compila e executa **antes** de compilar o crate. Serve para gerar código ou
+dados, compilar código C, procurar bibliotecas do sistema. Equivale a uma
+tarefa do Gradle ou a um script `prebuild` do npm.
+
+- O script conversa com o cargo imprimindo linhas `cargo:...`.
+  `cargo:rerun-if-changed=caminho` diz "só me rode de novo se isto mudar"
+  (sem nenhuma, o cargo o roda de novo sempre que qualquer arquivo do
+  crate muda).
+- O cargo passa informações por variáveis de ambiente: `OUT_DIR` (a pasta
+  para os arquivos gerados), `CARGO_MANIFEST_DIR` (a raiz do crate),
+  `CARGO` (o próprio cargo, para rodar outro).
+
+Do lado do código, três macros que rodam na compilação:
+
+- **`env!("NOME")`** vira o valor da variável de ambiente no momento da
+  compilação (um `&'static str`). Erro de compilação se ela não existir.
+- **`concat!(a, b)`** junta literais em um literal.
+- **`include_bytes!("caminho")`** lê o arquivo e o embute no executável como
+  um `&'static [u8; N]`. Existe também `include_str!`, para texto.
+
+Juntas, são o jeito padrão de embutir um arquivo gerado pelo `build.rs`:
+o script o escreve em `OUT_DIR`, e o código o inclui pelo mesmo caminho.
+
+## 41. Implementar `Iterator` e tempos de vida em structs
+
+```rust
+pub struct Arquivo<'a> {
+    pub nome: &'a str,
+    pub dados: &'a [u8],
+}
+
+pub struct Arquivos<'a> {
+    tar: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Iterator for Arquivos<'a> {
+    type Item = Arquivo<'a>;
+    fn next(&mut self) -> Option<Arquivo<'a>> { /* ... */ }
+}
+```
+
+**Iterator.** Os iteradores do §20 (`map`, `filter`, `find`...) funcionam
+com qualquer tipo que implemente o trait `Iterator`, e implementá-lo exige
+só duas coisas: o tipo do item (`type Item`) e o método `next`, que devolve
+`Some(item)` ou `None` quando acabar. Todo o resto (`for`, `find`, `count`,
+`map`...) vem de graça. É o `Iterator<T>` do Java com `hasNext` e `next`
+fundidos num método só, que devolve `Option`.
+
+**Tempo de vida (`'a`).** Uma struct que guarda **referências** precisa
+dizer por quanto tempo elas valem. `Arquivo<'a>` se lê: "um `Arquivo` que
+aponta para dentro de algo que vive pelo tempo `'a`". O compilador usa isso
+para garantir que um `Arquivo` nunca sobreviva ao tar de onde saiu (em Java,
+o coletor de lixo resolveria mantendo o tar vivo; em Rust, quem garante é o
+compilador, na compilação). Para o `RAMDISK`, que vive o programa todo, `'a`
+é `'static`; no teste que lê uma cópia do tar num `Vec`, `'a` é o tempo de
+vida do `Vec`, e o compilador recusaria usar um `Arquivo` depois do `Vec`
+morrer.
+
+## 42. `macro_rules!`: escrever as próprias macros
+
+```rust
+#[macro_export]
+macro_rules! println {
+    () => { $crate::print!("\n") };
+    ($($arg:tt)*) => {{ $crate::print!($($arg)*); $crate::print!("\n"); }};
+}
+```
+
+O §14 mostrou como **usar** macros. `macro_rules!` **define** uma: uma
+lista de regras "se a chamada tiver este formato, troque por este código".
+A troca acontece na compilação, antes da verificação de tipos.
+
+- Cada regra é `(padrão) => { código }`. A primeira que casar ganha.
+- `$nome:tipo` captura um pedaço: `$main:path` (um caminho, como `main`),
+  `$x:expr` (uma expressão), `$t:tt` (um *token tree*: qualquer token ou
+  grupo entre parênteses).
+- `$( ... )*` repete: `$($arg:tt)*` captura "qualquer sequência de tokens",
+  e `$($arg)*` a devolve igual. É assim que `println!` aceita o mesmo que
+  `format!`.
+- `#[macro_export]` torna a macro visível para quem usa o crate, na raiz
+  (`sos::println!`).
+- `$crate` é o caminho para o crate onde a macro foi definida. Dentro de um
+  programa, `$crate::print!` vira `sos::print!`, mesmo que o programa tenha
+  importado a biblioteca com outro nome.
+
+A macro `principal!` do doc 13 gera uma **função** inteira (`_start`), coisa
+que uma função comum não pode fazer.
+
+## 43. Genéricos com constantes: `const N: usize`
+
+```rust
+fn ler<const N: usize>(dados: &[u8], pos: u64) -> Result<[u8; N], ErroElf> { ... }
+
+let b: [u8; 8] = ler(dados, 24)?;       // N = 8, deduzido do tipo esperado
+let classe = ler::<1>(dados, 4)?[0];    // N = 1, dito explicitamente
+```
+
+Genéricos comuns (`Vec<T>`) recebem **tipos**. Genéricos constantes recebem
+**valores**, conhecidos na compilação: aqui, o tamanho do array devolvido.
+O compilador gera uma versão de `ler` para cada `N` usado, cada uma
+devolvendo um array de tamanho fixo (sem alocação).
+
+O `N` pode ser deduzido: `u64::from_le_bytes` exige um `[u8; 8]`, então em
+`u64::from_le_bytes(ler(d, p)?)` o compilador conclui que `N = 8`. Quando
+não há de onde deduzir, escreve-se com a "turbofish": `ler::<1>(...)`.
+
+Java não tem nada parecido: arrays em Java não carregam o tamanho no tipo.

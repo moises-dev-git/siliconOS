@@ -139,6 +139,27 @@ gives the CPU back when it wants to (doc 12).
 : A process that has already ended but stays in the table until someone
 reads its result and frees its memory (doc 12).
 
+**ELF** (*Executable and Linkable Format*)
+: The executable format of Linux and of almost every system that is neither
+Windows nor macOS. For loading, what matters are the LOAD **segments**
+(*program headers*): "copy these bytes from the file to this address, with
+these permissions" (doc 13).
+
+**Sections `.text`, `.rodata`, `.data`, `.bss`**
+: The classic parts of an executable: code, constants, global variables with
+an initial value and zeroed global variables. `.bss` takes no space in the
+file: only its size is stored, and whoever loads it creates the zeros
+(doc 13).
+
+**Linker script**
+: Instructions for the linker: at what address the program lives, in what
+order and with what alignment the sections go, which is the entry point
+(doc 13).
+
+**RAM disk** (*initrd*)
+: Files that are already in memory when the kernel starts, used before there
+is a disk driver. SiliconOS's is a tar file embedded in the kernel (doc 13).
+
 **Huge page**
 : A 2 MiB or 1 GiB page, which stops the walk through the tables earlier.
 It saves tables and TLB entries.

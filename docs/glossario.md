@@ -139,6 +139,27 @@ CPU quando quer (doc 12).
 : Um processo que já terminou, mas continua na tabela até alguém ler o
 resultado e liberar a memória dele (doc 12).
 
+**ELF** (*Executable and Linkable Format*)
+: O formato de executável do Linux e de quase todo sistema que não é Windows
+nem macOS. Para carregar, o que importa são os **segmentos** (*program
+headers*) do tipo LOAD: "copie estes bytes do arquivo para este endereço,
+com estas permissões" (doc 13).
+
+**Seções `.text`, `.rodata`, `.data`, `.bss`**
+: As partes clássicas de um executável: código, constantes, variáveis
+globais com valor inicial e variáveis globais zeradas. A `.bss` não ocupa
+espaço no arquivo: só o tamanho é guardado, e quem carrega cria os zeros
+(doc 13).
+
+**Script de ligação** (*linker script*)
+: Instruções para o ligador: em que endereço o programa mora, em que ordem
+e com que alinhamento vão as seções, qual é o ponto de entrada (doc 13).
+
+**Disco em RAM** (*RAM disk*, *initrd*)
+: Arquivos que já estão na memória quando o kernel começa, usados antes de
+existir um driver de disco. O do SiliconOS é um arquivo tar embutido no
+kernel (doc 13).
+
 **Página grande** (*huge page*)
 : Página de 2 MiB ou 1 GiB, que interrompe a caminhada pelas tabelas mais
 cedo. Economiza tabelas e entradas de TLB.

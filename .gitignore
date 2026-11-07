@@ -1,5 +1,6 @@
 # Saídas de compilação
 /target/
+/programas/target/
 /esp/EFI/BOOT/BOOTX64.efi
 /esp/NvVars
 serial.log

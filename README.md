@@ -34,10 +34,11 @@ OS or programmed in Rust. Each chapter's comments live in the
 | User mode: programs in ring 3, system calls (`int 0x80`) | `src/usuario/` | [10](docs-en/10-modo-usuario.md) |
 | One address space (PML4) per program | `src/memoria/espaco.rs` | [11](docs-en/11-espacos-de-enderecos.md) |
 | Preemptive scheduler: several programs at once | `src/escalonador.rs` | [12](docs-en/12-escalonador.md) |
+| User programs in Rust (ELF) on a RAM disk (tar) | `programas/`, `src/ramdisk.rs`, `src/usuario/elf.rs` | [13](docs-en/13-disco-em-ram-e-elf.md) |
 
 ## Running
 
-Requires Rust nightly with the `x86_64-unknown-uefi` target, QEMU and OVMF
+Requires Rust nightly with the `x86_64-unknown-uefi` and `x86_64-unknown-none` targets, QEMU and OVMF
 (details in [docs-en/README.md](docs-en/README.md#how-to-build-and-run)).
 
 ```bash

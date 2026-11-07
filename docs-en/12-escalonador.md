@@ -829,7 +829,7 @@ The 21 builds with test features still pass.
   locks taken with interrupts off would not be enough (another CPU keeps
   running).
 - **Processes only from built-in programs.** The next step loads programs
-  from "files" in the ELF format.
+  from "files" in the ELF format. *(Done in [doc 13](13-disco-em-ram-e-elf.md).)*
 
 ---
 

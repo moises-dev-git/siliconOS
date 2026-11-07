@@ -103,8 +103,10 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "ler", uso: "ler <endereco>", descricao: "le 8 bytes da memoria (pode dar page fault!)", funcao: ler },
     Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
     Comando { nome: "espacos", uso: "espacos", descricao: "dois espacos de enderecos, mesmo endereco, bytes diferentes", funcao: espacos },
-    Comando { nome: "rodar", uso: "rodar <programa> [&]", descricao: "roda um programa no anel 3 (& = segundo plano)", funcao: rodar_programa },
+    Comando { nome: "rodar", uso: "rodar <programa> [&]", descricao: "roda um programa (embutido ou do disco) no anel 3; & = segundo plano", funcao: rodar_programa },
     Comando { nome: "ps", uso: "ps", descricao: "lista os processos", funcao: ps },
+    Comando { nome: "ls", uso: "ls", descricao: "lista os arquivos do disco em RAM", funcao: ls },
+    Comando { nome: "elf", uso: "elf <arquivo>", descricao: "mostra o cabecalho e os segmentos de um ELF", funcao: elf },
     Comando { nome: "reiniciar", uso: "reiniciar", descricao: "reinicia a maquina", funcao: reiniciar },
     Comando { nome: "desligar", uso: "desligar", descricao: "desliga a maquina (ACPI; testado so no QEMU)", funcao: desligar },
 ];
@@ -274,18 +276,68 @@ fn espacos(_: &[&str]) {
 
 fn rodar_programa(argumentos: &[&str]) {
     use crate::usuario;
-    let Some(programa) = argumentos.first().and_then(|n| usuario::programas::procurar(n)) else {
-        kprintln!("uso: rodar <programa> [&]   (veja 'programas')");
+    let Some(&nome) = argumentos.first() else {
+        kprintln!("uso: rodar <programa> [&]   (veja 'programas' e 'ls')");
         return;
     };
-    if argumentos.get(1) == Some(&"&") {
+    let segundo_plano = argumentos.get(1) == Some(&"&");
+    // Primeiro os programas embutidos (doc 10), depois os arquivos do disco
+    // em RAM (doc 13).
+    let pid = if let Some(programa) = usuario::programas::procurar(nome) {
+        usuario::iniciar(programa, segundo_plano)
+    } else if let Some(arquivo) = crate::ramdisk::abrir(nome) {
+        match usuario::iniciar_elf(arquivo.nome, arquivo.dados, segundo_plano) {
+            Ok(pid) => pid,
+            Err(erro) => {
+                kprintln!("'{}' nao pode ser carregado: {:?}", nome, erro);
+                return;
+            }
+        }
+    } else {
+        kprintln!("'{}' nao existe (veja 'programas' e 'ls')", nome);
+        return;
+    };
+    if segundo_plano {
         // Segundo plano (doc 12): o shell não espera. Quando o programa
         // terminar, o escalonador imprime o resultado.
-        let pid = usuario::iniciar(programa, true);
-        kprintln!("[{}] '{}' em segundo plano", pid, programa.nome);
+        kprintln!("[{}] '{}' em segundo plano", pid, nome);
     } else {
-        let r = usuario::rodar(programa);
-        kprintln!("'{}' {}", programa.nome, usuario::descrever(r));
+        let r = escalonador::esperar(pid);
+        kprintln!("'{}' {}", nome, usuario::descrever(r));
+    }
+}
+
+/// Comando `ls` (doc 13): os arquivos do disco em RAM.
+fn ls(_: &[&str]) {
+    let mut total = 0;
+    for a in crate::ramdisk::arquivos() {
+        let tipo = if a.dados.starts_with(b"\x7fELF") { "executavel ELF" } else { "" };
+        kprintln!("  {:<12}{:>8} bytes  {}", a.nome, a.dados.len(), tipo);
+        total += 1;
+    }
+    kprintln!("{} arquivos; o disco em RAM (tar) ocupa {} bytes", total, crate::ramdisk::tamanho_total());
+}
+
+/// Comando `elf <arquivo>` (doc 13): o cabeçalho e os segmentos, como o
+/// `readelf -l` do Linux.
+fn elf(argumentos: &[&str]) {
+    use crate::usuario::elf;
+    let Some(arquivo) = argumentos.first().and_then(|n| crate::ramdisk::abrir(n)) else {
+        kprintln!("uso: elf <arquivo>   (veja 'ls')");
+        return;
+    };
+    let cab = match elf::ler_cabecalho(arquivo.dados) {
+        Ok(c) => c,
+        Err(e) => { kprintln!("nao e um ELF que o SiliconOS roda: {:?}", e); return; }
+    };
+    kprintln!("entrada: {:#x}; {} segmentos", cab.entrada, cab.ph_quantidade);
+    kprintln!("  TIPO   ARQUIVO   ENDERECO            NO ARQUIVO  NA MEMORIA  PERM");
+    for i in 0..cab.ph_quantidade {
+        let Ok(s) = elf::segmento(arquivo.dados, &cab, i) else { break };
+        let tipo = match s.tipo { elf::PT_LOAD => "LOAD", 0x6474_e551 => "STACK", 0x6474_e552 => "RELRO", _ => "outro" };
+        let p = elf::permissoes(s.flags);
+        kprintln!("  {:<6} {:#08x}  {:#018x}  {:>10}  {:>10}  {}", tipo, s.deslocamento, s.endereco,
+                  s.tam_arquivo, s.tam_memoria, core::str::from_utf8(&p).unwrap());
     }
 }
 

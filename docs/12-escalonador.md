@@ -813,7 +813,7 @@ As 21 builds com features de teste continuam passando.
 - **Uma CPU.** Com várias (SMP), cada uma teria o seu "atual", e os locks
   com interrupções desligadas não bastariam (outra CPU continua rodando).
 - **Processos só a partir de programas embutidos.** O próximo passo
-  carrega programas de "arquivos" no formato ELF.
+  carrega programas de "arquivos" no formato ELF. *(Feito no [doc 13](13-disco-em-ram-e-elf.md).)*
 
 ---
 

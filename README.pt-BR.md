@@ -30,10 +30,11 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Modo usuário: programas no anel 3, chamadas de sistema (`int 0x80`) | `src/usuario/` | [10](docs/10-modo-usuario.md) |
 | Um espaço de endereços (PML4) por programa | `src/memoria/espaco.rs` | [11](docs/11-espacos-de-enderecos.md) |
 | Escalonador preemptivo: vários programas ao mesmo tempo | `src/escalonador.rs` | [12](docs/12-escalonador.md) |
+| Programas de usuário em Rust (ELF) num disco em RAM (tar) | `programas/`, `src/ramdisk.rs`, `src/usuario/elf.rs` | [13](docs/13-disco-em-ram-e-elf.md) |
 
 ## Rodar
 
-Requer Rust nightly com o alvo `x86_64-unknown-uefi`, QEMU e OVMF
+Requer Rust nightly com os alvos `x86_64-unknown-uefi` e `x86_64-unknown-none`, QEMU e OVMF
 (detalhes em [docs/README.md](docs/README.md#como-compilar-e-rodar)).
 
 ```bash

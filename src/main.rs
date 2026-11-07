@@ -27,6 +27,7 @@ mod shell;
 mod testes;
 mod usuario;
 mod escalonador;
+mod ramdisk;
 
 use core::fmt::Write;
 use spin::Mutex;

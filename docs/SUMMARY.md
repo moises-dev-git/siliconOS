@@ -17,6 +17,7 @@
 - [10: Modo usuário](10-modo-usuario.md)
 - [11: Espaços de endereços](11-espacos-de-enderecos.md)
 - [12: O escalonador](12-escalonador.md)
+- [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md)
 
 # Referência
 

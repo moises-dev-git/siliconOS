@@ -63,6 +63,7 @@ book and then the matching document.
 | [10: User mode](10-modo-usuario.md) | Ring 3, `iretq`, system calls (`int 0x80`), isolated programs | 11.4 | ✅ |
 | [11: Address spaces](11-espacos-de-enderecos.md) | One PML4 per program, shared kernel, CR3 switch, a `Drop` that returns the frames | 11.4 | ✅ |
 | [12: The scheduler](12-escalonador.md) | Processes, context switch, a kernel stack per process, timer preemption, `ps` and `&` | 11.4 | ✅ |
+| [13: RAM disk and ELF](13-disco-em-ram-e-elf.md) | User programs in Rust, linker script, tar format, ELF loader | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 
@@ -73,10 +74,11 @@ book and then the matching document.
 Prerequisites:
 
 - **Rust nightly** with the `x86_64-unknown-uefi` target (the compiler
-  produces an executable in the format UEFI understands):
+  produces an executable in the format UEFI understands) and, since doc 13,
+  the `x86_64-unknown-none` target (for the Rust user programs):
   ```bash
   rustup toolchain install nightly
-  rustup target add x86_64-unknown-uefi --toolchain nightly
+  rustup target add x86_64-unknown-uefi x86_64-unknown-none --toolchain nightly
   ```
 - **QEMU** (`qemu-system-x86_64`), the PC emulator;
 - **OVMF**, the UEFI firmware QEMU uses. On Ubuntu/Debian both come with
