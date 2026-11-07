@@ -37,6 +37,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | User programs in Rust (ELF) on a RAM disk (tar) | `programas/`, `src/ramdisk.rs`, `src/usuario/elf.rs` | [13](docs-en/13-disco-em-ram-e-elf.md) |
 | System calls through `syscall`/`sysret` | `src/usuario/syscall.rs` | [14](docs-en/14-syscall-sysret.md) |
 | Blocked processes, idle process and the `dormir` (sleep) syscall | `src/escalonador.rs` | [15](docs-en/15-dormir-e-bloqueio.md) |
+| Arguments (argv) for programs, in the System V format | `src/usuario/argumentos.rs`, `programas/src/lib.rs` | [16](docs-en/16-argumentos.md) |
 
 ## Running
 

@@ -36,6 +36,11 @@ Bit operations used in the code:
 Sizes: **KiB** = 1024 bytes, **MiB** = 1024 KiB, **GiB**, **TiB**... (the
 "i" indicates a power of 2, to tell it apart from KB = 1000).
 
+**Little-endian**: the order in which the x86 CPU stores a multi-byte number
+in memory, **least significant byte first**. The number `0x0000_7FFF_FFFF_FFF4`
+is stored as `f4 ff ff ff ff 7f 00 00` (doc 16 shows a dump like that). In
+Rust, `u64::to_le_bytes` and `u64::from_le_bytes` convert both ways.
+
 ---
 
 ## The CPU inside
@@ -395,6 +400,33 @@ ring 3.
 : The contract at the machine-code level: which registers carry arguments
 and results, what the stack looks like. A calling convention and the list
 of system calls are part of the ABI.
+
+**System V (ABI)**
+: The ABI followed by Linux, FreeBSD and other Unixes on x86-64: the calling
+convention (arguments in RDI, RSI, RDX...; doc 14) and the format of a
+process's start (doc 16). The name comes from AT&T's Unix System V, from the
+80s.
+
+**argc / argv**
+: A program's command-line arguments: `argc` is how many there are (counting
+the program's name, which goes in `argv[0]`) and `argv` is the list of
+pointers to the strings, terminated by a 0. In System V, the kernel writes
+them at the top of the program's stack before the first instruction (doc 16).
+
+**envp** (environment variables)
+: The list of `NAME=value` strings a process receives right after `argv` on
+the initial stack (`PATH`, `HOME`...), also terminated by a 0. On SiliconOS,
+it is empty (doc 16).
+
+**Auxiliary vector** (*auxv*)
+: On Linux, a list of (type, value) pairs after `envp` on the initial stack:
+the page size, where the program headers are, etc. The dynamic loader and
+libc use it. SiliconOS does not provide it.
+
+**NUL-terminated** (0-terminated string)
+: C's string format: the bytes followed by a 0 byte, with no stored length.
+The reader walks until it finds the 0 (`strlen`). The doc 16 arguments arrive
+like that; Rust's `&str`, on the other hand, stores the length.
 
 **Position-independent code**
 : Machine code that works at any address, because it only uses addresses

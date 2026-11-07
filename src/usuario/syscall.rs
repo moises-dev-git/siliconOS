@@ -109,7 +109,7 @@ mod testes {
         // `medir` chama `tiques` 100 000 vezes por `int 0x80` e 100 000 por
         // `syscall`, e imprime pela `syscall`.
         let arquivo = crate::ramdisk::abrir("medir").unwrap();
-        let pid = super::super::iniciar_elf(arquivo.nome, arquivo.dados, false).unwrap();
+        let pid = super::super::iniciar_elf(arquivo.nome, arquivo.dados, &["medir"], false).unwrap();
         assert_eq!(crate::escalonador::esperar(pid), super::super::Resultado::Saiu(0));
     }
 }

@@ -75,8 +75,9 @@ roda os primeiros programas isolados, no modo usuário, o doc 11 dá a cada
 programa o seu próprio espaço de endereços, o doc 12 faz vários deles
 rodarem ao mesmo tempo, com um escalonador, o doc 13 os carrega de
 arquivos ELF, escritos em Rust, o doc 14 troca a porta de entrada no kernel
-por `syscall`/`sysret`, e o doc 15 deixa um processo esperar (dormir, ou
-esperar uma tecla) sem gastar a CPU.
+por `syscall`/`sysret`, o doc 15 deixa um processo esperar (dormir, ou
+esperar uma tecla) sem gastar a CPU, e o doc 16 entrega argumentos aos
+programas (`rodar primos 5000`).
 
 ---
 

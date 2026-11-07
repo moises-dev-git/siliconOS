@@ -125,6 +125,7 @@ other languages). The "Uses" column lists the modules it calls.
 |---|---|---|---|
 | `escalonador.rs` (scheduler) | The process table and the **context switch**: decides who runs, switches the stack, CR3 and TSS.RSP0. Creates, terminates and reaps processes; blocks and wakes them; holds the idle process. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
 | `usuario/mod.rs` (user) | Prepares a program (space, code, stack) and hands it to the scheduler. Handles the syscalls (`tratar_syscall`) and the programs' faults. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
+| `usuario/argumentos.rs` (arguments) | Builds a program's initial stack: argc, argv and the argument strings, in the System V format. | `memoria` | [16](16-argumentos.md) |
 | `usuario/syscall.rs` | The fast door into the kernel: configures the MSRs of the `syscall` instruction and holds the entry `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Reads ELF files (the executable format) and loads the segments into the program's space. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
 | `usuario/programas.rs` (programs) | The old programs, written in assembly and built into the kernel. | none | [10](10-modo-usuario.md) |
@@ -136,7 +137,7 @@ And outside `src/`:
 | Where | Job | Doc |
 |---|---|---|
 | `build.rs` | Before the kernel is compiled, compiles the programs in `programas/` and packs the executables into a tar file. | [13](13-disco-em-ram-e-elf.md) |
-| `programas/` | The user programs in Rust and the `sos` library they use to talk to the kernel. | [13](13-disco-em-ram-e-elf.md), [14](14-syscall-sysret.md) |
+| `programas/` | The user programs in Rust and the `sos` library they use to talk to the kernel (and to read their arguments). | [13](13-disco-em-ram-e-elf.md), [14](14-syscall-sysret.md), [16](16-argumentos.md) |
 
 ---
 
@@ -192,7 +193,7 @@ flowchart TB
     BURACO["non-canonical addresses: forbidden by the CPU"]
     subgraph BAIXA["Lower half: program"]
         direction TB
-        B3["just below 0x0000_8000_0000_0000<br/>stack of the Rust programs (4 pages)"]
+        B3["just below 0x0000_8000_0000_0000<br/>stack of the Rust programs (4 pages)<br/>at the top: argc, argv and the strings (doc 16)"]
         B2["0x0000_2000_0000_0000 (PML4 64)<br/>the program's code and data"]
         B1["0x0 up to the end of RAM (PML4 0)<br/>identity: the kernel itself, the screen<br/>(scaffolding; page 0 is left out)"]
     end
@@ -353,11 +354,14 @@ flowchart LR
         ELF -->|"build.rs packs the ELFs"| TAR["ramdisk.tar"]
         TAR -->|"include_bytes!"| KER["siliconos.efi"]
     end
-    subgraph EXEC["At run time: rodar primos"]
+    subgraph EXEC["At run time: rodar primos 5000"]
         direction TB
-        RD["ramdisk::abrir('primos')"] --> NE["EspacoEnderecos::novo<br/>new PML4"]
+        RD["ramdisk::abrir('primos')"]
+        NE["EspacoEnderecos::novo<br/>new PML4"]
+        RD --> ARG["argumentos::montar<br/>argc, argv and the strings<br/>(doc 16)"]
+        ARG --> NE
         NE --> CAR["elf::carregar<br/>validates the header and puts each segment<br/>in new frames, with R/W/X permissions"]
-        CAR --> PIL["stack: 4 pages<br/>below 0x8000_0000_0000"]
+        CAR --> PIL["stack: 4 pages<br/>below 0x8000_0000_0000<br/>the highest one gets the arguments"]
         PIL --> CR["escalonador::criar → Pronto"]
     end
     COMP -- "the tar travels<br/>inside the kernel" --> EXEC

@@ -36,6 +36,11 @@ Operações de bits usadas no código:
 Tamanhos: **KiB** = 1024 bytes, **MiB** = 1024 KiB, **GiB**, **TiB**...
 (o "i" indica potência de 2, para diferenciar de KB = 1000).
 
+**Little-endian**: a ordem em que a CPU x86 guarda um número de vários bytes
+na memória, **o byte menos significativo primeiro**. O número `0x0000_7FFF_FFFF_FFF4`
+fica na memória como `f4 ff ff ff ff 7f 00 00` (doc 16 mostra um dump assim).
+Em Rust, `u64::to_le_bytes` e `u64::from_le_bytes` convertem nos dois sentidos.
+
 ---
 
 ## A CPU por dentro
@@ -392,6 +397,32 @@ anel 3.
 : O contrato no nível do código de máquina: quais registradores carregam
 argumentos e resultados, como fica a pilha. Uma convenção de chamada e a
 lista de chamadas de sistema fazem parte da ABI.
+
+**System V (ABI)**
+: A ABI seguida pelo Linux, FreeBSD e outros Unix em x86-64: a convenção de
+chamada (argumentos em RDI, RSI, RDX...; doc 14) e o formato do início de um
+processo (doc 16). O nome vem do Unix System V, da AT&T, dos anos 80.
+
+**argc / argv**
+: Os argumentos da linha de comando de um programa: `argc` é quantos são
+(contando o nome do programa, que vai em `argv[0]`) e `argv` é a lista de
+ponteiros para os textos, terminada por um 0. No System V, o kernel os
+escreve no topo da pilha do programa antes da primeira instrução (doc 16).
+
+**envp** (variáveis de ambiente)
+: A lista de textos `NOME=valor` que um processo recebe logo depois de
+`argv` na pilha inicial (`PATH`, `HOME`...), também terminada por um 0. No
+SiliconOS, é vazia (doc 16).
+
+**Auxiliary vector** (*auxv*)
+: No Linux, uma lista de pares (tipo, valor) depois de `envp` na pilha
+inicial: o tamanho da página, onde estão os cabeçalhos do programa etc. O
+carregador dinâmico e a libc a usam. O SiliconOS não a entrega.
+
+**NUL-terminated** (texto terminado em 0)
+: O formato de texto do C: os bytes seguidos de um byte 0, sem tamanho
+guardado. Quem lê anda até achar o 0 (`strlen`). Os argumentos do doc 16
+chegam assim; o `&str` do Rust, ao contrário, guarda o tamanho.
 
 **Código independente de posição**
 : Código de máquina que funciona em qualquer endereço, porque só usa

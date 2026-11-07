@@ -7,11 +7,14 @@
 //! biblioteca do sistema (a libc no Linux). Aqui ela é este arquivo: cada
 //! função é uma chamada de sistema. Até o doc 13, pela instrução `int 0x80`
 //! (doc 10); desde o doc 14, pela instrução `syscall`, feita para isso.
+//! Desde o doc 16, também é quem lê os argumentos (argv) que o kernel deixa
+//! na pilha (docs/16-argumentos.md).
 
 #![no_std]
 
 use core::arch::asm;
 use core::fmt;
+use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
 
 // Números das chamadas de sistema (os mesmos de src/usuario/mod.rs do kernel).
 const SYS_SAIR: u64 = 0;
@@ -87,16 +90,80 @@ macro_rules! println {
     ($($arg:tt)*) => {{ $crate::print!($($arg)*); $crate::print!("\n"); }};
 }
 
+// ---------------------------------------------------------------------------
+// Início do programa e argumentos (doc 16)
+// ---------------------------------------------------------------------------
+
+/// argc e argv, guardados por `__iniciar` antes de `main`. Atômicos só para
+/// não precisar de `static mut`: o programa tem uma thread só.
+static ARGC: AtomicUsize = AtomicUsize::new(0);
+static ARGV: AtomicPtr<*const u8> = AtomicPtr::new(core::ptr::null_mut());
+
 /// Define o ponto de entrada `_start` (o que o ELF diz para executar
 /// primeiro), que chama `main` e passa o valor devolvido para `sair`.
+///
+/// Desde o doc 16, `_start` é uma função *naked* (só assembly): na entrada,
+/// RSP aponta para `argc`, que o kernel escreveu na pilha (formato System
+/// V), e uma função Rust comum não tem como saber onde estava o RSP antes
+/// do prólogo dela. O assembly passa esse RSP como 1º argumento e `main`
+/// como 2º para `__iniciar`, que guarda argc/argv e chama `main`.
 #[macro_export]
 macro_rules! principal {
     ($main:path) => {
+        #[unsafe(naked)]
         #[unsafe(no_mangle)]
-        pub extern "C" fn _start() -> ! {
-            $crate::sair($main())
+        pub unsafe extern "C" fn _start() -> ! {
+            core::arch::naked_asm!(
+                "mov rdi, rsp",           // 1º argumento: onde está argc
+                "lea rsi, [rip + {main}]", // 2º argumento: a função main
+                "and rsp, -16",           // alinhar em 16 (o kernel já alinha; garantia)
+                "call {iniciar}",         // o call empilha 8 bytes: o Rust espera isso
+                "ud2",                    // __iniciar não volta
+                main = sym $main,
+                iniciar = sym $crate::__iniciar,
+            )
         }
     };
+}
+
+/// Chamada pelo `_start` de `principal!`. Não é para os programas usarem.
+#[doc(hidden)]
+pub unsafe extern "C" fn __iniciar(pilha: *const u64, main: fn() -> u64) -> ! {
+    // pilha[0] = argc; pilha[1..] = argv[0], argv[1], ..., 0.
+    unsafe {
+        ARGC.store(*pilha as usize, Ordering::Relaxed);
+        ARGV.store(pilha.add(1) as *mut *const u8, Ordering::Relaxed);
+    }
+    sair(main())
+}
+
+/// Quantos argumentos o programa recebeu, contando o nome (argv[0]).
+pub fn quantos_argumentos() -> usize {
+    ARGC.load(Ordering::Relaxed)
+}
+
+/// O argumento `i` (0 = nome do programa), ou `None` se não existe.
+/// Como o `sys.argv[i]` do Python, mas sem estourar: devolve `None`.
+pub fn argumento(i: usize) -> Option<&'static str> {
+    if i >= quantos_argumentos() {
+        return None;
+    }
+    // O kernel garante: argv[i] aponta para um texto terminado em 0, que
+    // fica na pilha até o programa acabar (por isso 'static).
+    unsafe {
+        let inicio = *ARGV.load(Ordering::Relaxed).add(i);
+        let mut tamanho = 0;
+        while *inicio.add(tamanho) != 0 {
+            tamanho += 1;
+        }
+        let bytes = core::slice::from_raw_parts(inicio, tamanho);
+        Some(core::str::from_utf8(bytes).unwrap_or("?"))
+    }
+}
+
+/// Todos os argumentos, em ordem, como o `std::env::args()` do Rust.
+pub fn argumentos() -> impl Iterator<Item = &'static str> {
+    (0..quantos_argumentos()).filter_map(argumento)
 }
 
 #[panic_handler]

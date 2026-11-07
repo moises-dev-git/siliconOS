@@ -17,6 +17,7 @@
 //! `escalonador::encerrar`: a chamada `sair`, uma exceção da CPU no anel 3,
 //! ou o timer (tempo de CPU esgotado).
 
+pub mod argumentos;
 pub mod elf;
 pub mod programas;
 pub mod syscall;
@@ -112,25 +113,40 @@ pub const PILHA_ELF_PAGINAS: u64 = 4;
 
 /// Carrega um executável ELF (doc 13) num espaço de endereços próprio,
 /// com uma pilha de PILHA_ELF_PAGINAS páginas, e o entrega ao escalonador.
-pub fn iniciar_elf(nome: &'static str, dados: &[u8], segundo_plano: bool) -> Result<Pid, elf::ErroElf> {
+///
+/// Desde o doc 16, `argumentos` é o argv do programa, com o nome em
+/// argv[0] (como no `execve` do Linux): `["primos", "5000"]`. O kernel o
+/// escreve no topo da pilha, no formato do System V (`argumentos::montar`).
+pub fn iniciar_elf(nome: &'static str, dados: &[u8], argumentos: &[&str],
+                   segundo_plano: bool) -> Result<Pid, elf::ErroElf> {
+    // Primeiro os argumentos: se não couberem, nem vale a pena carregar.
+    let pilha = argumentos::montar(argumentos, PILHA_ELF_TOPO).map_err(elf::ErroElf::Argumentos)?;
     let mut espaco = EspacoEnderecos::novo().ok_or(elf::ErroElf::SemMemoria)?;
     // Se der erro daqui em diante, `espaco` é destruído na saída (`?`) e
     // devolve tudo o que já tinha sido mapeado.
     let entrada = elf::carregar(dados, &mut espaco)?;
     for i in 1..=PILHA_ELF_PAGINAS {
         let q = quadros::alocar().ok_or(elf::ErroElf::SemMemoria)?;
-        unsafe { core::ptr::write_bytes(paginacao::fisico_para_virtual(q.endereco()) as *mut u8, 0, 4096) };
+        let pagina = paginacao::fisico_para_virtual(q.endereco()) as *mut u8;
+        unsafe { core::ptr::write_bytes(pagina, 0, 4096) };
+        if i == 1 {
+            // A página mais alta recebe argc, argv e os textos, no fim dela
+            // (`montar` garante que cabem). O kernel escreve pelo endereço
+            // físico (deslocamento, doc 06): o espaço do programa não está ativo.
+            let inicio = TAMANHO_QUADRO as usize - pilha.bytes.len();
+            unsafe {
+                core::ptr::copy_nonoverlapping(pilha.bytes.as_ptr(), pagina.add(inicio), pilha.bytes.len());
+            }
+        }
         espaco.mapear(PILHA_ELF_TOPO - i * TAMANHO_QUADRO, q,
                       flags::USUARIO | flags::ESCRITA | flags::SEM_EXECUCAO)
             .map_err(|_| elf::ErroElf::SemMemoria)?;
     }
-    // RSP = topo - 8: o compilador gera `_start` como uma função comum, que
-    // espera ter sido chamada com `call` (que empilha 8 bytes de endereço de
-    // retorno numa pilha alinhada em 16). Com a pilha desalinhada, uma
-    // instrução que exige alinhamento (como `movaps`) daria #GP. Os três
-    // programas de hoje rodaram mesmo com RSP = topo (testado): só não usam
-    // nenhuma dessas. O erro ficaria escondido até o primeiro que usasse.
-    Ok(escalonador::criar(nome, espaco, entrada, PILHA_ELF_TOPO - 8, segundo_plano))
+    // RSP = o começo de argc, alinhado em 16, como o System V manda na
+    // entrada do programa. Até o doc 15 era topo - 8, para imitar um `call`;
+    // desde o doc 16 o `_start` da lib sos é escrito à mão e acerta o
+    // alinhamento ele mesmo antes de chamar o Rust.
+    Ok(escalonador::criar(nome, espaco, entrada, pilha.rsp, segundo_plano))
 }
 
 /// Roda o programa e espera ele terminar. Desde o doc 13, o shell faz o

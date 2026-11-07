@@ -36,6 +36,9 @@ pub enum ErroElf {
     EntradaInvalida,
     /// Faltaram quadros.
     SemMemoria,
+    /// Os argumentos não puderam ser entregues ao programa (doc 16). Não é
+    /// defeito do arquivo, mas é na hora de carregar que se descobre.
+    Argumentos(super::argumentos::ErroArgumentos),
 }
 
 /// O que nos interessa do cabeçalho ELF (os primeiros 64 bytes).
@@ -206,7 +209,7 @@ mod testes {
     use alloc::vec::Vec;
 
     fn rodar(nome: &'static str) -> Resultado {
-        let pid = crate::usuario::iniciar_elf(nome, ramdisk::abrir(nome).unwrap().dados, false).unwrap();
+        let pid = crate::usuario::iniciar_elf(nome, ramdisk::abrir(nome).unwrap().dados, &[nome], false).unwrap();
         escalonador::esperar(pid)
     }
 
@@ -233,6 +236,30 @@ mod testes {
         assert_eq!(rodar("oi"), Resultado::Saiu(0));
         assert_eq!(rodar("primos"), Resultado::Saiu(1229));
         assert_eq!(rodar("dados"), Resultado::Saiu(42));
+    }
+
+    /// Roda um programa do disco com estes argumentos (doc 16).
+    fn rodar_com(argv: &[&str]) -> Resultado {
+        let arquivo = ramdisk::abrir(argv[0]).unwrap();
+        escalonador::esperar(crate::usuario::iniciar_elf(arquivo.nome, arquivo.dados, argv, false).unwrap())
+    }
+
+    #[test_case]
+    fn argumentos_chegam_ao_programa() {
+        assert_eq!(rodar_com(&["args"]), Resultado::Saiu(1));
+        assert_eq!(rodar_com(&["args", "a", "bb", "ccc"]), Resultado::Saiu(4));
+        assert_eq!(rodar_com(&["primos", "100"]), Resultado::Saiu(25));
+        assert_eq!(rodar_com(&["primos", "abc"]), Resultado::Saiu(u64::MAX));
+    }
+
+    #[test_case]
+    fn argumentos_demais_recusados_sem_vazar() {
+        use crate::usuario::argumentos::{ErroArgumentos, MAX_ARGUMENTOS};
+        let livres = quadros::livres();
+        let arquivo = ramdisk::abrir("args").unwrap();
+        let r = crate::usuario::iniciar_elf(arquivo.nome, arquivo.dados, &["args"; MAX_ARGUMENTOS + 1], false);
+        assert_eq!(r, Err(ErroElf::Argumentos(ErroArgumentos::Demais)));
+        assert_eq!(quadros::livres(), livres);
     }
 
     #[test_case]

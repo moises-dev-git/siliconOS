@@ -61,6 +61,7 @@ do livro e depois o documento correspondente.
 | [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md) | Programas de usuário em Rust, script de ligação, formato tar, carregador de ELF | 11.4 | ✅ |
 | [14: syscall e sysret](14-syscall-sysret.md) | A porta rápida para o kernel: MSRs STAR/LSTAR/FMASK, troca de pilha manual, medição em ciclos | 11.4 | ✅ |
 | [15: Dormir e processos bloqueados](15-dormir-e-bloqueio.md) | Estado Bloqueado, processo ocioso, syscall `dormir`, o acordar perdido | 11.4 | ✅ |
+| [16: Argumentos para os programas](16-argumentos.md) | argc/argv na pilha inicial (formato System V), `_start` naked, `rodar primos 5000` | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 | [Mapa do SiliconOS](mapa.md) | Diagramas do sistema | — | ✅ |

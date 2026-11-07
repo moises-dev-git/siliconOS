@@ -1299,3 +1299,84 @@ e não 0.
 
 `Option::is_none_or(f)`, usado em `terminou`, é "está vazio, ou o valor
 dentro satisfaz `f`": `procurar(pid).is_none_or(|p| terminado(p))`.
+
+---
+
+## 46. `impl Iterator`, padrões em slices e textos vindos de bytes
+
+Usado no doc 16 (`programas/src/lib.rs`, `src/shell.rs`).
+
+**Devolver `impl Iterator`.** Um iterador em Rust tem um tipo concreto, às
+vezes enorme: `(0..n).filter_map(argumento)` é um
+`FilterMap<Range<usize>, ...>`, em que o `...` é o tipo próprio
+da função `argumento`. Escrever isso na
+assinatura seria ilegível e amarraria a função à implementação. Com `impl
+Trait` no **retorno**, a função diz só o que promete:
+
+```rust
+pub fn argumentos() -> impl Iterator<Item = &'static str> {
+    (0..quantos_argumentos()).filter_map(argumento)
+}
+```
+
+"Devolvo algum tipo que é um `Iterator` de textos." É parecido com devolver
+um `Iterable<String>` em Java ou um gerador em Python, com uma diferença: o
+tipo real continua um só, conhecido pelo compilador (não há objeto nem
+chamada virtual, §34). Quem chama usa os métodos de `Iterator` (§20):
+`for`, `enumerate`, `skip(1)`, `collect`.
+
+`filter_map(f)` chama `f` em cada elemento e fica só com os `Some`, já
+desembrulhados: é um `map` seguido de um `filter` que descarta os `None`.
+Passar `argumento` (o nome da função, sem parênteses) funciona porque uma
+função é um valor (§31).
+
+**Padrões que comparam valores dentro de um slice.** O padrão de um `match`
+pode conter valores fixos, não só nomes:
+
+```rust
+let (argv, segundo_plano) = match argumentos.split_last() {
+    Some((&"&", resto)) => (resto, true),
+    _ => (argumentos, false),
+};
+```
+
+`split_last()` devolve `Option<(&T, &[T])>`: o último elemento (por
+referência) e o resto. Como aqui `T` é `&str`, o último elemento chega como
+`&&str`; o `&` antes de `"&"` no padrão "tira" uma camada de referência para
+comparar com o texto. O padrão inteiro lê-se: "se houver último elemento, e
+ele for o texto `&`, chame o resto de `resto`". Se não casar, cai no `_`.
+
+**De bytes para `&str`: `str::from_utf8`.** Um `&str` em Rust é **sempre**
+UTF-8 válido; o compilador e a biblioteca contam com isso. Bytes que vêm de
+fora (um arquivo, a rede, o kernel) só viram texto depois de conferidos:
+
+```rust
+let bytes = core::slice::from_raw_parts(inicio, tamanho); // &[u8]
+Some(core::str::from_utf8(bytes).unwrap_or("?"))           // &str
+```
+
+`from_utf8` devolve `Result<&str, Utf8Error>`, sem copiar nada: o `&str`
+aponta para os mesmos bytes. `unwrap_or("?")` troca um erro por um valor
+fixo. (Em Java, `new String(bytes, UTF_8)` também decodifica, mas troca
+sequências inválidas por `�` em silêncio.)
+
+**`$crate` e `sym` numa macro.** Uma macro (§42) é expandida **no código de
+quem a usa**. Se `principal!` escrevesse `sos::__iniciar`, ela dependeria de o
+programa chamar a crate de `sos`. `$crate` é um nome especial que, na
+expansão, sempre aponta para a crate onde a macro foi definida:
+
+```rust
+main = sym $main,                   // a função que o programa passou
+iniciar = sym $crate::__iniciar,    // a função da própria sos
+```
+
+`sym` (§35) é o operando de `asm!`/`naked_asm!` que vira o **nome do
+símbolo** de uma função ou `static`, para o assembly usar em `call` ou
+`lea`. `$main:path` na regra da macro aceita um caminho (`main`,
+`meu::modulo::main`), que é exatamente o que `sym` espera.
+
+`#[doc(hidden)]` em `__iniciar` a esconde da documentação gerada: ela
+precisa ser `pub` (a macro, expandida em outra crate, a chama), mas não é
+para os programas usarem. Os dois sublinhados no nome são a mesma
+convenção: "público por necessidade, não por convite".
+

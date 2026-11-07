@@ -6,7 +6,7 @@ Todas as funções do kernel, agrupadas pelo arquivo onde moram e em ordem alfab
 
 Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir das tabelas "Funções deste capítulo" de cada capítulo, toda vez que o site é publicado. Quando uma função mudou num capítulo posterior, a frase diz "(desde o doc NN ...)"; o código atual está sempre em [`src/`](https://github.com/moises-dev-git/siliconOS/tree/main/src).
 
-287 funções e 61 testes (ou ajudantes de teste), de 16 capítulos.
+294 funções e 67 testes (ou ajudantes de teste), de 17 capítulos.
 
 ---
 
@@ -373,6 +373,12 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 |---|---|---|
 | `Testavel::rodar` | `Testavel::rodar` para toda função `Fn()`: imprime o nome do teste, roda e imprime `[ok]` (se der panic, o handler cuida). | [09](09-shell-e-testes.md#funções-deste-capítulo) |
 
+### [src/usuario/argumentos.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/usuario/argumentos.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `montar` | Monta num vetor o topo da pilha inicial de um programa (argc, argv, zeros, textos) e calcula o RSP, alinhado em 16; recusa argumentos vazios, demais, grandes ou com o byte 0. | [16](16-argumentos.md#funções-deste-capítulo) |
+
 ### [src/usuario/elf.rs](https://github.com/moises-dev-git/siliconOS/blob/main/src/usuario/elf.rs)
 
 | Função | O que faz | Doc |
@@ -439,6 +445,12 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 |---|---|---|
 | `main` (programas/build.rs) | Avisa o cargo para religar os programas quando o `linker.ld` mudar. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 
+### [programas/src/bin/args.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/args.rs)
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `main` (args) | Mostra argc e cada argumento com o endereço; sai com argc. | [16](16-argumentos.md#funções-deste-capítulo) |
+
 ### [programas/src/bin/dados.rs](https://github.com/moises-dev-git/siliconOS/blob/main/programas/src/bin/dados.rs)
 
 | Função | O que faz | Doc |
@@ -483,13 +495,18 @@ Esta página é **gerada automaticamente** (`site/indice_funcoes.py`) a partir d
 
 | Função | O que faz | Doc |
 |---|---|---|
+| `__iniciar` | Guarda argc e argv lidos da pilha inicial, chama `main` e sai com o valor devolvido. | [16](16-argumentos.md#funções-deste-capítulo) |
+| `_start` (de `principal!`) | (naked) Ponto de entrada do programa: passa o RSP inicial e `main` para `__iniciar`, com a pilha alinhada. | [16](16-argumentos.md#funções-deste-capítulo) |
 | `_start` (macro `principal!`) | Ponto de entrada gerado pela macro: chama o `main` do programa e passa o resultado a `sair`. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `argumento` | O argumento `i` como `&'static str` (anda até o byte 0), ou `None` se não existe. | [16](16-argumentos.md#funções-deste-capítulo) |
+| `argumentos` | Iterador sobre todos os argumentos, como o `std::env::args()`. | [16](16-argumentos.md#funções-deste-capítulo) |
 | `chamada` | Faz uma chamada de sistema por `syscall`, avisando o compilador que RCX e R11 mudam. | [14](14-syscall-sysret.md#funções-deste-capítulo) |
 | `Console::write_str` | `fmt::Write`: cada pedaço de texto formatado vira um `escrever` (base de `print!`/`println!`). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `dormir` (sos) | Chama a syscall `dormir`. | [15](15-dormir-e-bloqueio.md#funções-deste-capítulo) |
 | `escrever` | Chamada de sistema 1: escreve bytes no console e devolve quantos (ou um erro negativo). | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `panic` | Tratador de panic dos programas: imprime a mensagem e sai com 101. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `pid` | Chamada de sistema 3: o número do processo. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `quantos_argumentos` | argc: quantos argumentos, contando o nome do programa. | [16](16-argumentos.md#funções-deste-capítulo) |
 | `sair` | Chamada de sistema 0: termina o programa com o código dado. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `tiques` | Chamada de sistema 2: tiques do timer desde o boot. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 
@@ -604,15 +621,26 @@ Os `#[test_case]` que rodam com `cargo test` (doc [09](09-shell-e-testes.md)), a
 | `este_teste_falha` | Teste que falha de propósito (feature `teste-que-falha`), para mostrar a saída de uma falha. | [09](09-shell-e-testes.md#funções-deste-capítulo) |
 | `executar` | O `test_runner`: recebe a lista gerada pelo compilador, roda cada teste e sai do QEMU com sucesso. | [09](09-shell-e-testes.md#funções-deste-capítulo) |
 
+### src/usuario/argumentos.rs
+
+| Função | O que faz | Doc |
+|---|---|---|
+| `argumentos_ruins_recusados` | Teste: cada erro de `montar`, e o limite exato de uma página (4053 cabe, 4054 não). | [16](16-argumentos.md#funções-deste-capítulo) |
+| `ler_u64` | Ajudante: lê o número de 8 bytes que vai morar num endereço da pilha montada. | [16](16-argumentos.md#funções-deste-capítulo) |
+| `pilha_inicial_no_formato_system_v` | Teste: argc, ponteiros, zeros e textos nos lugares certos, RSP alinhado em 16. | [16](16-argumentos.md#funções-deste-capítulo) |
+
 ### src/usuario/elf.rs
 
 | Função | O que faz | Doc |
 |---|---|---|
+| `argumentos_chegam_ao_programa` | Teste: `args` sai com argc; `primos 100` sai com 25; `primos abc` sai com -1. | [16](16-argumentos.md#funções-deste-capítulo) |
+| `argumentos_demais_recusados_sem_vazar` | Teste: 33 argumentos são recusados por `iniciar_elf` sem alocar nenhum quadro. | [16](16-argumentos.md#funções-deste-capítulo) |
 | `arquivos_ruins_recusados_sem_vazar` | Teste: oito estragos diferentes, cada um recusado com o erro certo, sem perder quadros. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `cabecalho_do_oi` | Teste: o primeiro segmento de `oi` é LOAD, R-X, em `0x2000_0000_0000`, e contém a entrada. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `carregar_alterado` | Ajudante: carrega uma cópia de `oi` modificada por uma closure. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `programas_em_rust_rodam` | Teste: oi, primos e dados saem com 0, 1229 e 42. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
 | `rodar` (dos testes) | Ajudante: carrega um ELF do disco, roda e espera o resultado. | [13](13-disco-em-ram-e-elf.md#funções-deste-capítulo) |
+| `rodar_com` | Ajudante: roda um programa do disco com um argv e espera o resultado. | [16](16-argumentos.md#funções-deste-capítulo) |
 
 ### src/usuario/mod.rs
 

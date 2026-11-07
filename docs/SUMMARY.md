@@ -20,6 +20,7 @@
 - [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md)
 - [14: syscall e sysret](14-syscall-sysret.md)
 - [15: Dormir e bloqueio](15-dormir-e-bloqueio.md)
+- [16: Argumentos (argv)](16-argumentos.md)
 
 # Referência
 

@@ -1309,3 +1309,86 @@ And `a.div_ceil(b)` divides **rounding up**: `1.div_ceil(10)` is 1, not 0.
 
 `Option::is_none_or(f)`, used in `terminou`, means "it is empty, or the value
 inside satisfies `f`": `find(pid).is_none_or(|p| finished(p))`.
+
+---
+
+## 46. `impl Iterator`, patterns in slices and text from bytes
+
+Used in doc 16 (`programas/src/lib.rs`, `src/shell.rs`).
+
+**Returning `impl Iterator`.** An iterator in Rust has a concrete type,
+sometimes a huge one: `(0..n).filter_map(argumento)` is a
+`FilterMap<Range<usize>, ...>`, where the `...` is the function
+`argumento`'s own type. Writing that in the signature would be unreadable and
+would tie the function to its implementation. With `impl Trait` in the
+**return** position, the function says only what it promises:
+
+```rust
+pub fn argumentos() -> impl Iterator<Item = &'static str> {
+    (0..quantos_argumentos()).filter_map(argumento)
+}
+```
+
+"I return some type that is an `Iterator` of strings." It is similar to
+returning an `Iterable<String>` in Java or a generator in Python, with one
+difference: the real type is still a single one, known to the compiler (no
+object and no virtual call, §34). The caller uses the `Iterator` methods
+(§20): `for`, `enumerate`, `skip(1)`, `collect`.
+
+`filter_map(f)` calls `f` on each element and keeps only the `Some`s,
+already unwrapped: it is a `map` followed by a `filter` that drops the
+`None`s. Passing `argumento` (the function's name, without parentheses)
+works because a function is a value (§31).
+
+**Patterns that compare values inside a slice.** A `match` pattern can
+contain fixed values, not just names:
+
+```rust
+let (argv, segundo_plano) = match argumentos.split_last() {
+    Some((&"&", resto)) => (resto, true),
+    _ => (argumentos, false),
+};
+```
+
+`split_last()` returns `Option<(&T, &[T])>`: the last element (by reference)
+and the rest. Since `T` here is `&str`, the last element arrives as `&&str`;
+the `&` before `"&"` in the pattern "removes" one layer of reference so it can
+be compared with the string. The whole pattern reads: "if there is a last
+element, and it is the string `&`, call the rest `resto`". If it does not
+match, it falls into `_`.
+
+**From bytes to `&str`: `str::from_utf8`.** A `&str` in Rust is **always**
+valid UTF-8; the compiler and the library rely on that. Bytes coming from
+outside (a file, the network, the kernel) only become text after being
+checked:
+
+```rust
+let bytes = core::slice::from_raw_parts(inicio, tamanho); // &[u8]
+Some(core::str::from_utf8(bytes).unwrap_or("?"))           // &str
+```
+
+`from_utf8` returns `Result<&str, Utf8Error>` without copying anything: the
+`&str` points to the same bytes. `unwrap_or("?")` replaces an error with a
+fixed value. (In Java, `new String(bytes, UTF_8)` also decodes, but silently
+replaces invalid sequences with `�`.)
+
+**`$crate` and `sym` in a macro.** A macro (§42) is expanded **in the code
+of whoever uses it**. If `principal!` wrote `sos::__iniciar`, it would depend
+on the program calling the crate `sos`. `$crate` is a special name that, in
+the expansion, always points to the crate where the macro was defined:
+
+```rust
+main = sym $main,                   // the function the program passed
+iniciar = sym $crate::__iniciar,    // sos's own function
+```
+
+`sym` (§35) is the `asm!`/`naked_asm!` operand that becomes the **symbol
+name** of a function or `static`, for the assembly to use in `call` or
+`lea`. `$main:path` in the macro rule accepts a path (`main`,
+`my::module::main`), which is exactly what `sym` expects.
+
+`#[doc(hidden)]` on `__iniciar` hides it from the generated documentation:
+it has to be `pub` (the macro, expanded in another crate, calls it), but it
+is not meant for programs to use. The two leading underscores are the same
+convention: "public out of necessity, not by invitation".
+

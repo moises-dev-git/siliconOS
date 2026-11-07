@@ -121,6 +121,7 @@ em outras linguagens). A coluna "Usa" lista os módulos que ele chama.
 |---|---|---|---|
 | `escalonador.rs` | A tabela de processos e a **troca de contexto**: decide quem roda, troca de pilha, de CR3 e de TSS.RSP0. Cria, encerra e recolhe processos; bloqueia e acorda; tem o processo ocioso. | `memoria`, `gdt`, `timer`, `usuario` | [12](12-escalonador.md), [15](15-dormir-e-bloqueio.md) |
 | `usuario/mod.rs` | Prepara um programa (espaço, código, pilha) e o entrega ao escalonador. Trata as syscalls (`tratar_syscall`) e as falhas dos programas. | `escalonador`, `memoria`, `timer` | [10](10-modo-usuario.md), [12](12-escalonador.md), [13](13-disco-em-ram-e-elf.md) |
+| `usuario/argumentos.rs` | Monta a pilha inicial de um programa: argc, argv e os textos dos argumentos, no formato System V. | `memoria` | [16](16-argumentos.md) |
 | `usuario/syscall.rs` | A porta rápida para o kernel: configura os MSRs da instrução `syscall` e tem a entrada `entrada_syscall_rapida`. | `cpu`, `gdt`, `usuario` | [14](14-syscall-sysret.md) |
 | `usuario/elf.rs` | Lê arquivos ELF (o formato dos executáveis) e carrega os segmentos no espaço do programa. | `memoria`, `usuario` | [13](13-disco-em-ram-e-elf.md) |
 | `usuario/programas.rs` | Os programas antigos, escritos em assembly e embutidos no kernel. | nenhum | [10](10-modo-usuario.md) |
@@ -132,7 +133,7 @@ E fora de `src/`:
 | Onde | Trabalho | Doc |
 |---|---|---|
 | `build.rs` | Antes de compilar o kernel, compila os programas de `programas/` e junta os executáveis num arquivo tar. | [13](13-disco-em-ram-e-elf.md) |
-| `programas/` | Os programas de usuário em Rust e a biblioteca `sos` que eles usam para falar com o kernel. | [13](13-disco-em-ram-e-elf.md), [14](14-syscall-sysret.md) |
+| `programas/` | Os programas de usuário em Rust e a biblioteca `sos` que eles usam para falar com o kernel (e para ler os argumentos). | [13](13-disco-em-ram-e-elf.md), [14](14-syscall-sysret.md), [16](16-argumentos.md) |
 
 ---
 
@@ -188,7 +189,7 @@ flowchart TB
     BURACO["endereços não canônicos: proibidos pela CPU"]
     subgraph BAIXA["Metade baixa: programa"]
         direction TB
-        B3["perto de 0x0000_8000_0000_0000<br/>pilha dos programas em Rust (4 páginas)"]
+        B3["perto de 0x0000_8000_0000_0000<br/>pilha dos programas em Rust (4 páginas)<br/>no topo: argc, argv e os textos (doc 16)"]
         B2["0x0000_2000_0000_0000 (PML4 64)<br/>código e dados do programa"]
         B1["0x0 até o fim da RAM (PML4 0)<br/>identidade: o próprio kernel, a tela<br/>(andaime; a página 0 fica de fora)"]
     end
@@ -348,11 +349,14 @@ flowchart LR
         ELF -->|"build.rs junta os ELF"| TAR["ramdisk.tar"]
         TAR -->|"include_bytes!"| KER["siliconos.efi"]
     end
-    subgraph EXEC["Na execução: rodar primos"]
+    subgraph EXEC["Na execução: rodar primos 5000"]
         direction TB
-        RD["ramdisk::abrir('primos')"] --> NE["EspacoEnderecos::novo<br/>PML4 nova"]
+        RD["ramdisk::abrir('primos')"]
+        NE["EspacoEnderecos::novo<br/>PML4 nova"]
+        RD --> ARG["argumentos::montar<br/>argc, argv e os textos<br/>(doc 16)"]
+        ARG --> NE
         NE --> CAR["elf::carregar<br/>valida o cabeçalho e põe cada segmento<br/>em quadros novos, com as permissões R/W/X"]
-        CAR --> PIL["pilha: 4 páginas<br/>abaixo de 0x8000_0000_0000"]
+        CAR --> PIL["pilha: 4 páginas<br/>abaixo de 0x8000_0000_0000<br/>a mais alta recebe os argumentos"]
         PIL --> CR["escalonador::criar → Pronto"]
     end
     COMP -- "o tar viaja<br/>dentro do kernel" --> EXEC

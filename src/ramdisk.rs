@@ -93,7 +93,7 @@ mod testes {
     #[test_case]
     fn os_programas_estao_no_disco() {
         let nomes: alloc::vec::Vec<&str> = arquivos().map(|a| a.nome).collect();
-        assert_eq!(nomes, ["dados", "insone", "medir", "oi", "primos", "soneca"]);
+        assert_eq!(nomes, ["args", "dados", "insone", "medir", "oi", "primos", "soneca"]);
         assert!(arquivos().all(|a| a.dados.starts_with(b"\x7fELF")));
         assert!(abrir("nao-existe").is_none());
     }

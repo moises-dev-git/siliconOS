@@ -102,7 +102,7 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "ler", uso: "ler <endereco>", descricao: "le 8 bytes da memoria (pode dar page fault!)", funcao: ler },
     Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
     Comando { nome: "espacos", uso: "espacos", descricao: "dois espacos de enderecos, mesmo endereco, bytes diferentes", funcao: espacos },
-    Comando { nome: "rodar", uso: "rodar <programa> [&]", descricao: "roda um programa (embutido ou do disco) no anel 3; & = segundo plano", funcao: rodar_programa },
+    Comando { nome: "rodar", uso: "rodar <prog> [args]", descricao: "roda no anel 3; args: so os do disco; & no fim = 2o plano", funcao: rodar_programa },
     Comando { nome: "ps", uso: "ps", descricao: "lista os processos", funcao: ps },
     Comando { nome: "ls", uso: "ls", descricao: "lista os arquivos do disco em RAM", funcao: ls },
     Comando { nome: "elf", uso: "elf <arquivo>", descricao: "mostra o cabecalho e os segmentos de um ELF", funcao: elf },
@@ -275,17 +275,28 @@ fn espacos(_: &[&str]) {
 
 fn rodar_programa(argumentos: &[&str]) {
     use crate::usuario;
-    let Some(&nome) = argumentos.first() else {
-        kprintln!("uso: rodar <programa> [&]   (veja 'programas' e 'ls')");
+    // Um `&` no fim pede segundo plano (doc 12); o resto é o argv do
+    // programa (doc 16), com o nome em argv[0].
+    let (argv, segundo_plano) = match argumentos.split_last() {
+        Some((&"&", resto)) => (resto, true),
+        _ => (argumentos, false),
+    };
+    let Some(&nome) = argv.first() else {
+        kprintln!("uso: rodar <programa> [argumentos...] [&]   (veja 'programas' e 'ls')");
         return;
     };
-    let segundo_plano = argumentos.get(1) == Some(&"&");
     // Primeiro os programas embutidos (doc 10), depois os arquivos do disco
     // em RAM (doc 13).
     let pid = if let Some(programa) = usuario::programas::procurar(nome) {
+        if argv.len() > 1 {
+            // Escritos em assembly, com uma página de pilha só: não sabem
+            // ler argumentos.
+            kprintln!("'{}' e um programa embutido e nao recebe argumentos (os do disco recebem)", nome);
+            return;
+        }
         usuario::iniciar(programa, segundo_plano)
     } else if let Some(arquivo) = crate::ramdisk::abrir(nome) {
-        match usuario::iniciar_elf(arquivo.nome, arquivo.dados, segundo_plano) {
+        match usuario::iniciar_elf(arquivo.nome, arquivo.dados, argv, segundo_plano) {
             Ok(pid) => pid,
             Err(erro) => {
                 kprintln!("'{}' nao pode ser carregado: {:?}", nome, erro);

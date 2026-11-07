@@ -530,9 +530,9 @@ mod testes {
         listar()[OCIOSO].3
     }
 
-    fn rodar_do_disco(nome: &str) -> Resultado {
+    fn rodar_do_disco(nome: &'static str) -> Resultado {
         let arquivo = crate::ramdisk::abrir(nome).unwrap();
-        esperar(usuario::iniciar_elf(arquivo.nome, arquivo.dados, false).unwrap())
+        esperar(usuario::iniciar_elf(arquivo.nome, arquivo.dados, &[nome], false).unwrap())
     }
 
     #[test_case]
