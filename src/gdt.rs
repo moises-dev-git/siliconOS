@@ -140,6 +140,7 @@ pub fn init() {
         }
     })));
     let tss = tss.0.get() as *const Tss;
+    unsafe { RSP0_ATUAL = (&raw const (*tss).rsp as *const u64).read_unaligned() };
 
     let gdt = GDT.call_once(|| {
         let (tss_baixo, tss_alto) =
@@ -231,8 +232,16 @@ pub fn topo_pilha_anel0() -> u64 {
 /// interrupção. (O campo não é alinhado: a TSS é `packed`.)
 pub fn definir_rsp0(topo: u64) {
     let tss = TSS.get().expect("gdt::init antes de definir_rsp0");
-    unsafe { (&raw mut (*tss.0.get()).rsp as *mut u64).write_unaligned(topo) };
+    unsafe {
+        (&raw mut (*tss.0.get()).rsp as *mut u64).write_unaligned(topo);
+        RSP0_ATUAL = topo;
+    }
 }
+
+/// Cópia de TSS.rsp[0] num lugar que o assembly alcança pelo nome (doc 14):
+/// a instrução `syscall`, ao contrário de `int`, NÃO troca de pilha, e a
+/// entrada de `syscall` lê daqui a pilha do kernel do processo atual.
+pub static mut RSP0_ATUAL: u64 = 0;
 
 /// Endereço do topo da pilha IST de double fault (para exibir no boot).
 pub fn topo_pilha_double_fault() -> u64 {

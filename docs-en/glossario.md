@@ -457,6 +457,13 @@ event). Level-triggered: it continues while the signal is active.
 : CPU configuration registers identified by number, read with `rdmsr`.
 E.g. `0x1B` = the local APIC's address.
 
+**`syscall` / `sysret`**
+: The instructions made only for system calls in 64-bit mode. `syscall`
+saves RIP in RCX and RFLAGS in R11 and jumps to the address in the LSTAR
+MSR, without looking at the IDT and without switching stacks; `sysret`
+returns. Configured through the EFER (SCE bit), STAR, LSTAR and FMASK MSRs
+(doc 14).
+
 **ACPI**
 : Tables the firmware leaves in memory describing the hardware. The path is
 RSDP → XSDT → tables such as the MADT.

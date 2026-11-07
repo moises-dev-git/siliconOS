@@ -19,6 +19,7 @@
 
 pub mod elf;
 pub mod programas;
+pub mod syscall;
 
 use alloc::format;
 use alloc::string::String;

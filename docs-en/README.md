@@ -64,6 +64,7 @@ book and then the matching document.
 | [11: Address spaces](11-espacos-de-enderecos.md) | One PML4 per program, shared kernel, CR3 switch, a `Drop` that returns the frames | 11.4 | ✅ |
 | [12: The scheduler](12-escalonador.md) | Processes, context switch, a kernel stack per process, timer preemption, `ps` and `&` | 11.4 | ✅ |
 | [13: RAM disk and ELF](13-disco-em-ram-e-elf.md) | User programs in Rust, linker script, tar format, ELF loader | 11.4 | ✅ |
+| [14: syscall and sysret](14-syscall-sysret.md) | The fast door into the kernel: STAR/LSTAR/FMASK MSRs, manual stack switch, cycle measurements | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 

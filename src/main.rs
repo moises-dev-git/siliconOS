@@ -199,6 +199,8 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
     // Antes das interrupções: o primeiro tique já chama o escalonador. O
     // código que está rodando agora vira o processo 0.
     escalonador::init();
+    // `syscall`/`sysret` (docs/14-syscall-sysret.md): MSRs STAR, LSTAR, FMASK e EFER.SCE.
+    usuario::syscall::init();
 
     // ---- Interrupções de hardware (docs/08-interrupcoes-de-hardware.md) ----
     interrupcoes::init();

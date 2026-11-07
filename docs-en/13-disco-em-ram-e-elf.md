@@ -1290,7 +1290,7 @@ The 21 builds with test features still pass.
   `ET_EXEC` is accepted.
 - **`int 0x80` on every `println!`.** Each formatted piece is a system call;
   the next chapter replaces the mechanism with `syscall`/`sysret`, built for
-  this.
+  this. *(Done in [doc 14](14-syscall-sysret.md).)*
 
 ---
 

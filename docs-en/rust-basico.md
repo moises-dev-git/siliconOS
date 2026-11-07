@@ -1208,3 +1208,40 @@ fixed-size array (no allocation).
 is nothing to infer from, you write it with the "turbofish": `ler::<1>(...)`.
 
 Java has nothing like it: Java arrays do not carry their size in the type.
+
+## 44. `asm!`: clobbered registers and `#[inline(always)]`
+
+```rust
+#[inline(always)]
+fn chamada(numero: u64, a: u64, b: u64) -> u64 {
+    let r: u64;
+    unsafe {
+        asm!("syscall", inlateout("rax") numero => r, in("rdi") a, in("rsi") b,
+             lateout("rcx") _, lateout("r11") _, options(nostack));
+    }
+    r
+}
+```
+
+`asm!` (§15) is a contract with the compiler: it knows **only** what you
+declare. Each operand states a register's role:
+
+| Operand | Meaning |
+|---|---|
+| `in("rdi") a` | puts `a` in RDI before; the assembly does not change RDI |
+| `out("eax") x` | afterwards, reads EAX into `x` |
+| `inlateout("rax") n => r` | puts `n` in RAX before and reads RAX into `r` after |
+| `lateout("rcx") _` | RCX comes out of here holding garbage: keep nothing in it |
+
+The `_` in place of the variable means "discarded" (*clobbered*). The
+`syscall` instruction writes RCX and R11 on its own (doc 14); without
+declaring that, the compiler could keep a value in RCX before the `asm!` and
+rely on it afterwards. The bug would not show at the `asm!` but far away, as
+a mysteriously wrong value. ("late" means the register is only written at
+the end, so the compiler may use the same register for an input.)
+
+**`#[inline(always)]`** asks the compiler to paste the function's body at
+every call site instead of emitting a `call`. For tiny functions like
+`chamada`, it avoids the cost of a function call around every system call.
+Without the attribute the compiler decides on its own (and is almost always
+right); with it, the decision is ours.

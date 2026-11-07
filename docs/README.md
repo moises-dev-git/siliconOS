@@ -55,6 +55,7 @@ do livro e depois o documento correspondente.
 | [11: Espaços de endereços](11-espacos-de-enderecos.md) | Uma PML4 por programa, kernel compartilhado, troca de CR3, `Drop` que devolve os quadros | 11.4 | ✅ |
 | [12: O escalonador](12-escalonador.md) | Processos, troca de contexto, pilha do kernel por processo, preempção pelo timer, `ps` e `&` | 11.4 | ✅ |
 | [13: Disco em RAM e ELF](13-disco-em-ram-e-elf.md) | Programas de usuário em Rust, script de ligação, formato tar, carregador de ELF | 11.4 | ✅ |
+| [14: syscall e sysret](14-syscall-sysret.md) | A porta rápida para o kernel: MSRs STAR/LSTAR/FMASK, troca de pilha manual, medição em ciclos | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 

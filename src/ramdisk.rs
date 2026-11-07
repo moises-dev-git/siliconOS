@@ -91,9 +91,9 @@ mod testes {
     use super::*;
 
     #[test_case]
-    fn os_tres_programas_estao_no_disco() {
+    fn os_programas_estao_no_disco() {
         let nomes: alloc::vec::Vec<&str> = arquivos().map(|a| a.nome).collect();
-        assert_eq!(nomes, ["dados", "oi", "primos"]);
+        assert_eq!(nomes, ["dados", "medir", "oi", "primos"]);
         assert!(arquivos().all(|a| a.dados.starts_with(b"\x7fELF")));
         assert!(abrir("nao-existe").is_none());
     }
@@ -110,7 +110,7 @@ mod testes {
         // Uma cópia do tar com um byte do primeiro nome trocado: a soma de
         // verificação não bate mais, e a leitura para logo no começo.
         let mut copia = alloc::vec::Vec::from(RAMDISK);
-        assert_eq!(Arquivos { tar: &copia, pos: 0 }.count(), 3);
+        assert_eq!(Arquivos { tar: &copia, pos: 0 }.count(), 4);
         copia[0] ^= 0x20;
         assert_eq!(Arquivos { tar: &copia, pos: 0 }.count(), 0);
     }

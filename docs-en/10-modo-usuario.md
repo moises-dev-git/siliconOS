@@ -782,7 +782,7 @@ not do:
   instructions, made for this, configured through MSRs (STAR, LSTAR,
   SFMASK). The book recommends starting with the software interrupt, which
   is easier to understand, and switching once the behavior is right, which
-  is what we did.
+  is what we did. *(Switched in [doc 14](14-syscall-sysret.md).)*
 - **SMAP and SMEP** off.
 
 ---

@@ -5,7 +5,8 @@
 //! Um programa em Rust sem sistema operacional (`no_std`) não tem `println!`
 //! nem `std::process::exit`: quem fornece isso, num sistema de verdade, é a
 //! biblioteca do sistema (a libc no Linux). Aqui ela é este arquivo: cada
-//! função é uma chamada de sistema `int 0x80` (doc 10).
+//! função é uma chamada de sistema. Até o doc 13, pela instrução `int 0x80`
+//! (doc 10); desde o doc 14, pela instrução `syscall`, feita para isso.
 
 #![no_std]
 
@@ -18,35 +19,40 @@ const SYS_ESCREVER: u64 = 1;
 const SYS_TIQUES: u64 = 2;
 const SYS_PID: u64 = 3;
 
+/// Uma chamada de sistema com até dois argumentos, pela instrução
+/// `syscall` (doc 14). Número em RAX, argumentos em RDI e RSI, resultado em
+/// RAX. A própria CPU usa RCX (endereço de volta) e R11 (RFLAGS): o
+/// compilador precisa saber que os dois mudam (`lateout(...) _`).
+#[inline(always)]
+fn chamada(numero: u64, a: u64, b: u64) -> u64 {
+    let r: u64;
+    unsafe {
+        asm!("syscall", inlateout("rax") numero => r, in("rdi") a, in("rsi") b,
+             lateout("rcx") _, lateout("r11") _, options(nostack));
+    }
+    r
+}
+
 /// Termina o programa com o código dado. Não volta.
 pub fn sair(codigo: u64) -> ! {
-    unsafe { asm!("int 0x80", in("rax") SYS_SAIR, in("rdi") codigo, options(noreturn)) }
+    chamada(SYS_SAIR, codigo, 0);
+    unreachable!("o kernel voltou de sair()")
 }
 
 /// Escreve os bytes no console. Devolve quantos foram escritos, ou um erro
 /// negativo (-14 se o kernel recusar o ponteiro).
 pub fn escrever(bytes: &[u8]) -> i64 {
-    let r: u64;
-    unsafe {
-        // O kernel preserva todos os registradores, menos RAX (o resultado).
-        asm!("int 0x80", inlateout("rax") SYS_ESCREVER => r,
-             in("rdi") bytes.as_ptr(), in("rsi") bytes.len(), options(nostack));
-    }
-    r as i64
+    chamada(SYS_ESCREVER, bytes.as_ptr() as u64, bytes.len() as u64) as i64
 }
 
 /// Tiques do timer desde o boot (100 por segundo).
 pub fn tiques() -> u64 {
-    let r: u64;
-    unsafe { asm!("int 0x80", inlateout("rax") SYS_TIQUES => r, options(nostack)) };
-    r
+    chamada(SYS_TIQUES, 0, 0)
 }
 
 /// O número deste processo.
 pub fn pid() -> u64 {
-    let r: u64;
-    unsafe { asm!("int 0x80", inlateout("rax") SYS_PID => r, options(nostack)) };
-    r
+    chamada(SYS_PID, 0, 0)
 }
 
 /// Destino de `print!`: cada pedaço de texto formatado vira um `escrever`.

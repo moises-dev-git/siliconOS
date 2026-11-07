@@ -252,8 +252,9 @@ mod testes {
         // O segundo segmento no mesmo endereço do primeiro:
         assert_eq!(carregar_alterado(|d| { let p = ph(d) + 56 + 16; d[p..p + 8].copy_from_slice(&0x0000_2000_0000_0000u64.to_le_bytes()) }),
                    Err(ErroElf::Sobreposto));
-        // Ponto de entrada fora do código:
-        assert_eq!(carregar_alterado(|d| d[24..32].copy_from_slice(&0x0000_2000_0000_1000u64.to_le_bytes())),
+        // Ponto de entrada fora do código: o endereço do segundo segmento (as
+        // constantes, R--), lido do próprio arquivo.
+        assert_eq!(carregar_alterado(|d| { let p = ph(d) + 56 + 16; let v: [u8; 8] = d[p..p + 8].try_into().unwrap(); d[24..32].copy_from_slice(&v) }),
                    Err(ErroElf::EntradaInvalida));
         assert_eq!(quadros::livres(), livres);
     }

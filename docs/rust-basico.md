@@ -1196,3 +1196,41 @@ O `N` pode ser deduzido: `u64::from_le_bytes` exige um `[u8; 8]`, então em
 não há de onde deduzir, escreve-se com a "turbofish": `ler::<1>(...)`.
 
 Java não tem nada parecido: arrays em Java não carregam o tamanho no tipo.
+
+## 44. `asm!`: registradores descartados e `#[inline(always)]`
+
+```rust
+#[inline(always)]
+fn chamada(numero: u64, a: u64, b: u64) -> u64 {
+    let r: u64;
+    unsafe {
+        asm!("syscall", inlateout("rax") numero => r, in("rdi") a, in("rsi") b,
+             lateout("rcx") _, lateout("r11") _, options(nostack));
+    }
+    r
+}
+```
+
+O `asm!` (§15) é um contrato com o compilador: ele **só** sabe o que você
+declarar. Cada operando diz o papel de um registrador:
+
+| Operando | Significa |
+|---|---|
+| `in("rdi") a` | põe `a` em RDI antes; o assembly não muda RDI |
+| `out("eax") x` | depois, lê EAX para `x` |
+| `inlateout("rax") n => r` | põe `n` em RAX antes e lê RAX para `r` depois |
+| `lateout("rcx") _` | RCX sai daqui com lixo: não guarde nada nele |
+
+O `_` no lugar da variável quer dizer "descartado" (*clobbered*). A
+instrução `syscall` escreve em RCX e R11 sozinha (doc 14); sem declarar
+isso, o compilador poderia guardar um valor em RCX antes do `asm!` e contar
+com ele depois. O erro não apareceria no `asm!`, e sim longe dali, como um
+valor misteriosamente errado. ("late" quer dizer que o registrador só é
+escrito no fim, então o compilador pode usar o mesmo registrador para uma
+entrada.)
+
+**`#[inline(always)]`** pede ao compilador que cole o corpo da função em
+cada lugar onde ela é chamada, em vez de fazer um `call`. Para funções
+minúsculas como `chamada`, evita o custo de uma chamada de função em volta
+de cada chamada de sistema. Sem o atributo, o compilador decide sozinho (e
+quase sempre acerta); com ele, a decisão é nossa.

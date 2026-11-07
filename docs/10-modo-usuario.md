@@ -745,6 +745,7 @@ Este é o modo usuário mínimo, e vale ser honesto sobre o que ele não faz:
   feitas para isso, configuradas por MSRs (STAR, LSTAR, SFMASK). O livro
   recomenda começar pela interrupção de software, mais fácil de entender, e
   trocar depois que o comportamento estiver certo, que é o que fizemos.
+  *(Trocado no [doc 14](14-syscall-sysret.md).)*
 - **SMAP e SMEP** desligados.
 
 ---

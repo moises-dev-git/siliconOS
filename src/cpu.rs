@@ -58,6 +58,15 @@ pub fn ler_msr(numero: u32) -> u64 {
     (alto as u64) << 32 | baixo as u64
 }
 
+/// Escreve um MSR (`wrmsr`: número em ECX, valor em EDX:EAX). Usado para
+/// configurar `syscall`/`sysret` (doc 14).
+pub fn escrever_msr(numero: u32, valor: u64) {
+    unsafe {
+        asm!("wrmsr", in("ecx") numero, in("edx") (valor >> 32) as u32, in("eax") valor as u32,
+             options(nostack, preserves_flags));
+    }
+}
+
 /// Reinicia a máquina. Primeiro pelo jeito do PC AT: o controlador do
 /// teclado (8042) também controla a linha de RESET da CPU, e o comando 0xFE
 /// dá um pulso nela. Se não funcionar, provoca um triple fault de propósito:

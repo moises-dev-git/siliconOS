@@ -18,6 +18,7 @@
 - [11: Address spaces](11-espacos-de-enderecos.md)
 - [12: The scheduler](12-escalonador.md)
 - [13: RAM disk and ELF](13-disco-em-ram-e-elf.md)
+- [14: syscall and sysret](14-syscall-sysret.md)
 
 # Reference
 

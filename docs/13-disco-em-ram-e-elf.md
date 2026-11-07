@@ -1272,7 +1272,7 @@ As 21 builds com features de teste continuam passando.
   com endereço fixo.
 - **`int 0x80` em todo `println!`.** Cada pedaço formatado é uma chamada de
   sistema; o próximo capítulo troca o mecanismo por `syscall`/`sysret`,
-  feito para isso.
+  feito para isso. *(Feito no [doc 14](14-syscall-sysret.md).)*
 
 ---
 
