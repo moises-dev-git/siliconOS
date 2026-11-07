@@ -22,5 +22,7 @@
 
 # Referência
 
+- [Mapa do SiliconOS](mapa.md)
+- [Índice de funções](funcoes.md)
 - [Rust para quem já programa](rust-basico.md)
 - [Glossário](glossario.md)

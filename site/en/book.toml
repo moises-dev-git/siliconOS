@@ -14,4 +14,4 @@ default-theme = "light"
 preferred-dark-theme = "navy"
 no-section-label = true
 site-url = "/en/"
-additional-js = ["idioma.js", "giscus.js"]
+additional-js = ["idioma.js", "giscus.js", "mermaid.js"]

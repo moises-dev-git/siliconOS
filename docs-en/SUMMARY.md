@@ -22,5 +22,7 @@
 
 # Reference
 
+- [SiliconOS map](mapa.md)
+- [Function index](funcoes.md)
 - [Rust for people who already program](rust-basico.md)
 - [Glossary](glossario.md)

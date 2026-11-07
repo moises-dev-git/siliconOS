@@ -31,7 +31,11 @@ do livro e depois o documento correspondente.
    - **[Rust para quem já programa](rust-basico.md)**: só os recursos de
      Rust usados no projeto, comparados com Java, Kotlin, JS e Python;
    - **[Glossário](glossario.md)**: registradores, pilha, anéis,
-     interrupções, hexadecimal...
+     interrupções, hexadecimal...;
+   - **[Mapa do SiliconOS](mapa.md)**: diagramas do sistema inteiro (módulos,
+     memória, o caminho de uma tecla, de uma syscall, do timer);
+   - **[Índice de funções](funcoes.md)**: todas as funções, por arquivo, em
+     uma frase cada.
 3. Siga os capítulos em ordem. Cada um começa dizendo o que você vai
    aprender e termina com um resumo e perguntas para fixar.
 
@@ -58,6 +62,8 @@ do livro e depois o documento correspondente.
 | [14: syscall e sysret](14-syscall-sysret.md) | A porta rápida para o kernel: MSRs STAR/LSTAR/FMASK, troca de pilha manual, medição em ciclos | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
+| [Mapa do SiliconOS](mapa.md) | Diagramas do sistema | — | ✅ |
+| [Índice de funções](funcoes.md) | Todas as funções (gerado) | — | ✅ |
 
 ---
 

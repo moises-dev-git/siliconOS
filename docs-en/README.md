@@ -40,7 +40,11 @@ book and then the matching document.
      Rust features used in the project, compared with Java, Kotlin, JS and
      Python;
    - **[Glossary](glossario.md)**: registers, stack, rings, interrupts,
-     hexadecimal...
+     hexadecimal...;
+   - **[SiliconOS map](mapa.md)**: diagrams of the whole system (modules,
+     memory, the path of a key press, of a syscall, of the timer);
+   - **[Function index](funcoes.md)**: every function, by file, in one
+     sentence each.
 3. Follow the chapters in order. Each one starts by saying what you will
    learn and ends with a summary and review questions.
 
@@ -67,6 +71,8 @@ book and then the matching document.
 | [14: syscall and sysret](14-syscall-sysret.md) | The fast door into the kernel: STAR/LSTAR/FMASK MSRs, manual stack switch, cycle measurements | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
+| [SiliconOS map](mapa.md) | System diagrams | — | ✅ |
+| [Function index](funcoes.md) | Every function (generated) | — | ✅ |
 
 ---
 
