@@ -113,6 +113,11 @@ Cada tabela ocupa um quadro de 4 KiB e tem 512 entradas (doc 06).
 : Registrador que guarda o endereço físico da tabela do nível mais alto
 (PML4). Trocar o CR3 troca o espaço de endereços inteiro.
 
+**Espaço de endereços** (*address space*)
+: O conjunto de traduções virtual → físico que vale num momento: uma árvore
+de tabelas de página com a sua PML4. No SiliconOS, cada programa tem o seu,
+e todos compartilham as entradas do kernel (doc 11).
+
 **Página grande** (*huge page*)
 : Página de 2 MiB ou 1 GiB, que interrompe a caminhada pelas tabelas mais
 cedo. Economiza tabelas e entradas de TLB.

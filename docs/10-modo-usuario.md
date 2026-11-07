@@ -735,7 +735,7 @@ Este é o modo usuário mínimo, e vale ser honesto sobre o que ele não faz:
   do kernel; o que o protege é o bit USUARIO. Um sistema de verdade dá a
   cada processo a **sua própria PML4** (e troca o CR3 a cada troca de
   processo), para que dois programas possam usar o mesmo endereço sem se
-  ver.
+  ver. *(Feito no [doc 11](11-espacos-de-enderecos.md).)*
 - **Um programa de cada vez,** e o shell espera ele terminar. Rodar vários
   ao mesmo tempo exige guardar o estado de cada um: um escalonador.
 - **Programas embutidos no kernel.** Carregar de um arquivo exige um formato

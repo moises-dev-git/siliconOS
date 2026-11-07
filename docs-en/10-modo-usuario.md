@@ -772,6 +772,7 @@ not do:
   tables; what protects it is the USUARIO bit. A real system gives each
   process **its own PML4** (and switches CR3 on every process switch), so
   two programs can use the same address without seeing each other.
+  *(Done in [doc 11](11-espacos-de-enderecos.md).)*
 - **One program at a time,** and the shell waits for it to finish. Running
   several at once requires saving each one's state: a scheduler.
 - **Programs built into the kernel.** Loading from a file requires an

@@ -16,6 +16,8 @@
 pub mod mapa;
 #[allow(dead_code)]
 pub mod paginacao;
+// Um espaço de endereços (PML4 própria) por programa (docs/11).
+pub mod espaco;
 #[allow(dead_code)]
 pub mod quadros;
 #[allow(dead_code)]

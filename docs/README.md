@@ -52,6 +52,7 @@ do livro e depois o documento correspondente.
 | [08: Interrupções de hardware](08-interrupcoes-de-hardware.md) | 8259, APIC e ACPI; timer a 100 Hz; teclado PS/2; deadlock | 9 | ✅ |
 | [09: Shell e testes](09-shell-e-testes.md) | Shell interativo, `cargo test` no QEMU, depuração com GDB | 10 | ✅ |
 | [10: Modo usuário](10-modo-usuario.md) | Anel 3, `iretq`, chamadas de sistema (`int 0x80`), programas isolados | 11.4 | ✅ |
+| [11: Espaços de endereços](11-espacos-de-enderecos.md) | Uma PML4 por programa, kernel compartilhado, troca de CR3, `Drop` que devolve os quadros | 11.4 | ✅ |
 | [Rust para quem já programa](rust-basico.md) | Referência de Rust | — | ✅ |
 | [Glossário](glossario.md) | Referência de termos | — | ✅ |
 

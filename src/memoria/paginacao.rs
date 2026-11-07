@@ -85,12 +85,12 @@ pub struct Tabela {
 const _: () = assert!(core::mem::size_of::<Tabela>() == 4096);
 
 /// Acessa a tabela que está no endereço FÍSICO `fisico`.
-fn tabela_em(fisico: u64) -> &'static mut Tabela {
+pub(super) fn tabela_em(fisico: u64) -> &'static mut Tabela {
     unsafe { &mut *(fisico_para_virtual(fisico) as *mut Tabela) }
 }
 
 /// Pega um quadro livre e zera (uma tabela nova começa sem nenhuma entrada).
-fn nova_tabela() -> Option<u64> {
+pub(super) fn nova_tabela() -> Option<u64> {
     let q = quadros::alocar()?;
     unsafe { core::ptr::write_bytes(fisico_para_virtual(q.endereco()) as *mut u8, 0, 4096) };
     Some(q.endereco())
@@ -218,6 +218,8 @@ pub enum ErroMapeamento {
     NaoMapeado,
     /// O alocador de quadros não tem quadro para uma tabela nova.
     SemMemoria,
+    /// O espaço de um programa não pode mapear onde o kernel mora (doc 11).
+    AreaDoKernel,
 }
 
 /// Faz o endereço virtual `virt` apontar para o físico `fisico`, criando as
@@ -289,12 +291,33 @@ pub fn desmapear_em(raiz: u64, virt: u64) -> Result<u64, ErroMapeamento> {
     Err(ErroMapeamento::NaoMapeado)
 }
 
+/// Mapeia nas tabelas do KERNEL (não nas do programa que estiver ativo:
+/// desde o doc 11, cada programa tem a sua PML4, e o CR3 pode apontar para ela).
 pub fn mapear(virt: u64, fisico: u64, tamanho: TamanhoPagina, bits: u64) -> Result<(), ErroMapeamento> {
-    mapear_em(raiz_atual(), virt, fisico, tamanho, bits)
+    mapear_em(raiz_kernel(), virt, fisico, tamanho, bits)
 }
 
 pub fn desmapear(virt: u64) -> Result<u64, ErroMapeamento> {
-    desmapear_em(raiz_atual(), virt)
+    desmapear_em(raiz_kernel(), virt)
+}
+
+/// Endereço físico da PML4 do kernel (montada por `init`). Antes do `init`,
+/// as tabelas ativas são as do UEFI.
+static RAIZ_KERNEL: AtomicU64 = AtomicU64::new(0);
+
+pub fn raiz_kernel() -> u64 {
+    match RAIZ_KERNEL.load(Ordering::Relaxed) {
+        0 => raiz_atual(),
+        r => r,
+    }
+}
+
+/// Troca as tabelas ativas: escreve `raiz` (endereço físico de uma PML4) no
+/// CR3. A CPU esvazia a TLB (menos as entradas GLOBAL) na mesma instrução.
+pub fn ativar(raiz: u64) {
+    if raiz_atual() != raiz {
+        unsafe { asm!("mov cr3, {}", in(reg) raiz, options(nostack, preserves_flags)) };
+    }
 }
 
 /// Tira o endereço da TLB (o cache de traduções da CPU). Sem isso, a CPU
@@ -363,6 +386,7 @@ pub fn init(mapa: &Mapa, framebuffer: u64, tamanho_framebuffer: u64) -> Resumo {
     //    tabelas. Tudo que o kernel usa (código, pilha, GDT, IDT, framebuffer,
     //    bitmap) precisa estar mapeado nelas, senão: page fault imediato.
     unsafe { asm!("mov cr3, {}", in(reg) pml4, options(nostack, preserves_flags)) };
+    RAIZ_KERNEL.store(pml4, Ordering::Relaxed);
 
     // 5. Daqui em diante, memória física é acessada pela metade alta.
     DESLOCAMENTO_ATUAL.store(DESLOCAMENTO_FISICO, Ordering::Relaxed);

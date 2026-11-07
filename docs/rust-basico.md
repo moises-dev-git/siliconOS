@@ -987,3 +987,49 @@ garante que o primeiro argumento vem em RDI, como o assembly espera,
 independentemente do alvo. A convenção também diz quais registradores a
 função chamada precisa **preservar**: na `sysv64`, RBX, RBP e R12–R15. São
 exatamente os que `entrar_no_anel3` empilha.
+
+## 38. `Drop`: código que roda quando o valor morre
+
+```rust
+impl Drop for EspacoEnderecos {
+    fn drop(&mut self) {
+        // devolve os quadros ao alocador
+    }
+}
+```
+
+Em Java, um objeto que ninguém mais referencia some "algum dia", quando o
+coletor de lixo passar; `finalize` (ou um `Cleaner`) pode nunca rodar, e por
+isso recursos são fechados à mão, com `try-with-resources`/`close()`. Em
+Rust não há coletor: cada valor tem **um dono**, e o valor morre num ponto
+exato do código, quando o dono sai de escopo:
+
+```rust
+{
+    let espaco = EspacoEnderecos::novo().unwrap();
+    // ... usa espaco ...
+}   // <- aqui: o compilador insere a chamada de `drop`
+```
+
+Implementar o trait `Drop` diz o que fazer nesse momento. É o mesmo padrão
+do `try-with-resources` ou do `with` do Python, só que automático e
+impossível de esquecer: se o tipo tem `Drop`, o compilador chama em todo
+caminho que encerra o escopo (fim do bloco, `return`, `?`, panic com
+unwinding). O nome tradicional disso é **RAII** (*Resource Acquisition Is
+Initialization*): o recurso vive exatamente o tempo que o valor vive.
+
+Detalhes que aparecem no SiliconOS:
+
+- **`drop(valor)`** (a função da biblioteca padrão, não o método) adianta a
+  morte: move o valor para dentro dela, e ele morre ali. `rodar` (doc 11)
+  usa isso para destruir o espaço num ponto escolhido, depois de voltar ao
+  CR3 do kernel. Chamar o método `valor.drop()` diretamente é proibido pelo
+  compilador: ele não deixaria o valor morrer duas vezes.
+- **Coleções levam junto.** Quando um `Vec<(&str, EspacoEnderecos)>` morre,
+  cada elemento morre também, e cada `Drop` roda (o comando `espacos`, doc 11).
+- **Mover tira a responsabilidade.** `espaco.mapear(virt, quadro, ...)`
+  recebe o `Quadro` por valor: depois da chamada, quem chamou não pode mais
+  usá-lo, e quem cuida dele é o espaço. É assim que o tipo expressa "agora o
+  dono é outro".
+- O `MutexGuard` do `spin::Mutex` ([§11](#11-mutex-e-once-da-crate-spin)) usa o mesmo mecanismo: o `Drop`
+  dele é que destrava o mutex.

@@ -71,7 +71,8 @@ cada etapa dá ferramentas para a próxima:
 O SiliconOS já concluiu as etapas 1 a 5: a memória (docs 05 a 07), as
 interrupções de hardware, com timer e teclado (doc 08), e um shell
 interativo com testes automáticos (doc 09). A etapa 6 começou: o doc 10
-roda os primeiros programas isolados, no modo usuário.
+roda os primeiros programas isolados, no modo usuário, e o doc 11 dá a cada
+programa o seu próprio espaço de endereços.
 
 ---
 

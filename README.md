@@ -32,6 +32,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | Hardware interrupts: APIC via ACPI, 100 Hz timer, PS/2 keyboard | `src/interrupcoes/`, `src/acpi.rs` | [08](docs-en/08-interrupcoes-de-hardware.md) |
 | Shell, `cargo test` inside QEMU, debugging with GDB | `src/shell.rs`, `src/testes.rs` | [09](docs-en/09-shell-e-testes.md) |
 | User mode: programs in ring 3, system calls (`int 0x80`) | `src/usuario/` | [10](docs-en/10-modo-usuario.md) |
+| One address space (PML4) per program | `src/memoria/espaco.rs` | [11](docs-en/11-espacos-de-enderecos.md) |
 
 ## Running
 

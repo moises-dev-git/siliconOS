@@ -113,6 +113,11 @@ takes one 4 KiB frame and has 512 entries (doc 06).
 : Register holding the physical address of the top-level table (PML4).
 Switching CR3 switches the whole address space.
 
+**Address space**
+: The set of virtual → physical translations in effect at a given moment: a
+page table tree with its own PML4. In SiliconOS each program has its own,
+and they all share the kernel's entries (doc 11).
+
 **Huge page**
 : A 2 MiB or 1 GiB page, which stops the walk through the tables earlier.
 It saves tables and TLB entries.

@@ -6,11 +6,12 @@
 //! O ciclo de vida de um programa:
 //!
 //!   shell: rodar ola
-//!     └─ rodar()                       mapeia código e pilha com o bit USUARIO
+//!     └─ rodar()                       cria um espaço de endereços (doc 11), mapeia
+//!                                      código e pilha com o bit USUARIO, ativa o espaço
 //!          └─ entrar_no_anel3()        salva o RSP do kernel, monta um quadro e faz iretq
 //!               ═══════ anel 3 ═══════ o programa roda; int 0x80 = chamada de sistema
 //!               ◄─ voltar_ao_kernel()  restaura o RSP salvo: entrar_no_anel3 "retorna"
-//!     └─ rodar()                       desmapeia, devolve os quadros, informa o resultado
+//!     └─ rodar()                       volta ao CR3 do kernel, destrói o espaço, informa o resultado
 //!
 //! O programa termina por um de três caminhos, e todos acabam em `encerrar`:
 //! a chamada `sair`, uma exceção da CPU no anel 3, ou o timer (tempo esgotado).
@@ -24,6 +25,7 @@ use spin::Mutex;
 use crate::gdt;
 use crate::idt::QuadroInterrupcao;
 use crate::interrupcoes::timer;
+use crate::memoria::espaco::EspacoEnderecos;
 use crate::memoria::paginacao::{self, flags};
 use crate::memoria::{quadros, TAMANHO_QUADRO};
 use crate::{cpu, kprint, kprintln};
@@ -73,33 +75,38 @@ pub fn rodar(programa: &programas::Programa) -> Resultado {
     let codigo = programa.codigo();
     assert!(codigo.len() <= TAMANHO_QUADRO as usize, "programa maior que uma pagina");
 
-    // 1. Uma página de código (só leitura, executável) e uma de pilha
-    //    (escrita, sem execução), as duas acessíveis pelo anel 3.
+    // 1. Um espaço de endereços só deste programa (doc 11): uma PML4 nova,
+    //    com o kernel copiado e a metade do programa vazia.
+    let mut espaco = EspacoEnderecos::novo().expect("sem quadros para a PML4 do programa");
+
+    // 2. Uma página de código (só leitura, executável) e uma de pilha
+    //    (escrita, sem execução), as duas acessíveis pelo anel 3. O espaço
+    //    fica dono dos quadros.
     let q_codigo = nova_pagina_zerada();
-    let q_pilha = nova_pagina_zerada();
     unsafe {
         let destino = paginacao::fisico_para_virtual(q_codigo.endereco()) as *mut u8;
         core::ptr::copy_nonoverlapping(codigo.as_ptr(), destino, codigo.len());
     }
-    paginacao::mapear(CODIGO_VIRT, q_codigo.endereco(), paginacao::TamanhoPagina::K4,
-                      flags::USUARIO).expect("mapear o codigo do programa");
-    paginacao::mapear(PILHA_VIRT, q_pilha.endereco(), paginacao::TamanhoPagina::K4,
-                      flags::USUARIO | flags::ESCRITA | flags::SEM_EXECUCAO).expect("mapear a pilha");
+    espaco.mapear(CODIGO_VIRT, q_codigo, flags::USUARIO).expect("mapear o codigo do programa");
+    espaco.mapear(PILHA_VIRT, nova_pagina_zerada(),
+                  flags::USUARIO | flags::ESCRITA | flags::SEM_EXECUCAO).expect("mapear a pilha");
 
-    // 2. Entrar no anel 3. Só volta quando o programa terminar.
+    // 3. Ativar o espaço (CR3) e entrar no anel 3. Só volta quando o
+    //    programa terminar.
     *RESULTADO.lock() = None;
     INICIO.store(timer::tiques(), Ordering::Relaxed);
     ATIVO.store(true, Ordering::Relaxed);
+    espaco.ativar();
     unsafe { entrar_no_anel3(CODIGO_VIRT, PILHA_VIRT + TAMANHO_QUADRO) };
+    // De volta: as tabelas ativas ainda são as do programa. Voltar às do
+    // kernel ANTES de destruir as do programa.
+    paginacao::ativar(paginacao::raiz_kernel());
     ATIVO.store(false, Ordering::Relaxed);
     // Voltamos de dentro de um tratador (interrupções desligadas).
     cpu::ligar_interrupcoes();
 
-    // 3. Limpar: nada do programa fica mapeado.
-    for (virt, q) in [(CODIGO_VIRT, q_codigo), (PILHA_VIRT, q_pilha)] {
-        paginacao::desmapear(virt).expect("desmapear");
-        quadros::liberar(q);
-    }
+    // 4. Limpar: destruir o espaço devolve páginas, tabelas e a PML4.
+    drop(espaco);
     RESULTADO.lock().take().expect("programa terminou sem resultado")
 }
 
@@ -285,14 +292,14 @@ mod testes {
 
     #[test_case]
     fn nada_fica_mapeado_nem_vaza() {
-        // A primeira execução cria as tabelas intermediárias da entrada 64
-        // da PML4 (PDPT, PD e PT: 3 quadros), que `desmapear` não libera
-        // (doc 06). Rodar uma vez antes torna o teste independente da ordem.
-        rodar_por_nome("ola");
+        // Desde o doc 11 não precisa de aquecimento: as tabelas do programa
+        // morrem com o espaço dele, então a primeira execução também não
+        // deixa nada para trás.
         let livres = quadros::livres();
         rodar_por_nome("ola");
         assert!(paginacao::traduzir(CODIGO_VIRT).is_none());
         assert!(paginacao::traduzir(PILHA_VIRT).is_none());
+        assert_eq!(paginacao::raiz_atual(), paginacao::raiz_kernel());
         assert_eq!(quadros::livres(), livres);
     }
 

@@ -996,3 +996,52 @@ first argument comes in RDI, as the assembly expects, regardless of the
 target. The convention also says which registers the called function must
 **preserve**: in `sysv64`, RBX, RBP and R12–R15. Those are exactly the ones
 `entrar_no_anel3` pushes.
+
+## 38. `Drop`: code that runs when the value dies
+
+```rust
+impl Drop for EspacoEnderecos {
+    fn drop(&mut self) {
+        // return the frames to the allocator
+    }
+}
+```
+
+In Java, an object nobody references any more disappears "some day", when
+the garbage collector comes by; `finalize` (or a `Cleaner`) may never run,
+which is why resources are closed by hand with `try-with-resources`/`close()`.
+Rust has no collector: each value has **one owner**, and the value dies at
+an exact point in the code, when the owner goes out of scope:
+
+```rust
+{
+    let espaco = EspacoEnderecos::novo().unwrap();
+    // ... use espaco ...
+}   // <- here: the compiler inserts the call to `drop`
+```
+
+Implementing the `Drop` trait says what to do at that moment. It is the same
+pattern as `try-with-resources` or Python's `with`, but automatic and
+impossible to forget: if the type has `Drop`, the compiler calls it on every
+path that ends the scope (end of block, `return`, `?`, a panic with
+unwinding). The traditional name for this is **RAII** (*Resource
+Acquisition Is Initialization*): the resource lives exactly as long as the
+value.
+
+Details that show up in SiliconOS:
+
+- **`drop(value)`** (the standard library function, not the method) brings
+  the death forward: it moves the value into itself, and the value dies
+  there. `rodar` (doc 11) uses it to destroy the address space at a chosen
+  point, after switching back to the kernel's CR3. Calling the method
+  `value.drop()` directly is forbidden by the compiler: it would not let
+  the value die twice.
+- **Collections take their contents along.** When a
+  `Vec<(&str, EspacoEnderecos)>` dies, each element dies too, and each
+  `Drop` runs (the `espacos` command, doc 11).
+- **Moving hands over the responsibility.** `espaco.mapear(virt, quadro, ...)`
+  takes the `Quadro` by value: after the call, the caller can no longer use
+  it, and the address space looks after it. That is how the type says "the
+  owner is someone else now".
+- The `MutexGuard` from `spin::Mutex` ([§11](#11-mutex-and-once-from-the-spin-crate)) uses the same mechanism: its
+  `Drop` is what unlocks the mutex.

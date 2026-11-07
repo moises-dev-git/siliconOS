@@ -93,6 +93,7 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "traduzir", uso: "traduzir <endereco>", descricao: "mostra a traducao de um endereco virtual", funcao: traduzir },
     Comando { nome: "ler", uso: "ler <endereco>", descricao: "le 8 bytes da memoria (pode dar page fault!)", funcao: ler },
     Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
+    Comando { nome: "espacos", uso: "espacos", descricao: "dois espacos de enderecos, mesmo endereco, bytes diferentes", funcao: espacos },
     Comando { nome: "rodar", uso: "rodar <programa>", descricao: "roda um programa no anel 3", funcao: rodar_programa },
     Comando { nome: "reiniciar", uso: "reiniciar", descricao: "reinicia a maquina", funcao: reiniciar },
     Comando { nome: "desligar", uso: "desligar", descricao: "desliga a maquina (ACPI; testado so no QEMU)", funcao: desligar },
@@ -222,6 +223,44 @@ fn programas(_: &[&str]) {
         kprintln!("  {:<14}{} ({} bytes)", p.nome, p.descricao, p.codigo().len());
     }
 }
+
+/// Demonstração do doc 11: o código de `ola` e o de `relogio` no MESMO
+/// endereço virtual, cada um no seu espaço de endereços, os dois vivos ao
+/// mesmo tempo.
+fn espacos(_: &[&str]) {
+    use crate::memoria::espaco::EspacoEnderecos;
+    use crate::memoria::paginacao::{self, flags};
+    use crate::memoria::quadros;
+    use crate::usuario::{programas, CODIGO_VIRT};
+
+    let kernel = paginacao::raiz_kernel();
+    kprintln!("kernel:   PML4 em {:#x}; {:#x} -> {}", kernel, CODIGO_VIRT,
+              if paginacao::traduzir_em(kernel, CODIGO_VIRT).is_some() { "mapeado" } else { "nao mapeado" });
+    let usadas: Vec<usize> = (0..512).filter(|&i| !EspacoEnderecos::entrada_livre(i)).collect();
+    kprintln!("entradas da PML4 do kernel (copiadas em todo espaco): {:?}", usadas);
+    let mut criados: Vec<(&str, EspacoEnderecos)> = Vec::new();
+    for nome in ["ola", "relogio"] {
+        let codigo = programas::procurar(nome).unwrap().codigo();
+        let Some(q) = quadros::alocar() else { kprintln!("sem memoria"); return };
+        unsafe {
+            let destino = paginacao::fisico_para_virtual(q.endereco()) as *mut u8;
+            core::ptr::write_bytes(destino, 0, 4096);
+            core::ptr::copy_nonoverlapping(codigo.as_ptr(), destino, codigo.len());
+        }
+        let Some(mut espaco) = EspacoEnderecos::novo() else { quadros::liberar(q); kprintln!("sem memoria"); return };
+        if espaco.mapear(CODIGO_VIRT, q, flags::USUARIO).is_err() { kprintln!("sem memoria"); return }
+        criados.push((nome, espaco));
+    }
+    for (nome, espaco) in &criados {
+        // Ler os primeiros bytes com este espaço ativo (o kernel continua
+        // visível nele, então este código segue rodando normalmente).
+        espaco.ativar();
+        let bytes = unsafe { (CODIGO_VIRT as *const [u8; 8]).read_volatile() };
+        paginacao::ativar(kernel);
+        kprintln!("{:<9} PML4 em {:#x}; {:#x} -> fisico {:#x}; bytes {:02x?}", nome, espaco.raiz(),
+                  CODIGO_VIRT, espaco.traduzir(CODIGO_VIRT).unwrap().fisico, bytes);
+    }
+} // `criados` é destruído aqui: PML4, tabelas e páginas voltam ao alocador
 
 fn rodar_programa(argumentos: &[&str]) {
     use crate::usuario::{self, Resultado};
