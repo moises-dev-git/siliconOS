@@ -722,6 +722,36 @@ linhas que mudaram estão na [comparação entre as duas tags](https://github.co
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `demonstrar_heap` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | No boot normal, usa `Box`, `Vec` e `String` e imprime onde eles moram: a prova de que o heap funciona. |
+| `testes_de_heap` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | Testes do heap escolhidos pela feature (`teste-heap`, `teste-heap-liberacao-dupla`, `teste-heap-esgotar`...). |
+| `AlocadorBump::alloc` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Alocador bump: alinha o ponteiro, avança-o pelo tamanho pedido e devolve o início. Nunca reaproveita nada. |
+| `AlocadorBump::dealloc` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Só conta a liberação: um bump não consegue devolver memória. |
+| `init` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Mapeia a faixa do heap para o alocador bump (usado só com a feature `teste-bump`). |
+| `estado` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Bytes consumidos, alocações e liberações do bump (para comparar com o heap de verdade). |
+| `alinhar_acima` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Arredonda um número para cima até o próximo múltiplo de uma potência de 2. |
+| `mapear_faixa` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Mapeia uma faixa de páginas, cada uma num quadro novo, com ESCRITA e SEM_EXECUCAO; devolve quantos bytes conseguiu. |
+| `tamanho_real` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Tamanho que o heap realmente reserva: múltiplo de 16 e nunca menor que um `NoLivre`. |
+| `Heap::procurar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | First fit: anda pela lista e recorta o primeiro bloco livre onde o pedido cabe alinhado; as sobras voltam para a lista. |
+| `Heap::inserir` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Devolve um bloco à lista em ordem de endereço e o junta com os vizinhos encostados; detecta liberação dupla. |
+| `Heap::crescer` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Mapeia mais páginas no fim do heap (até o limite) e as insere como bloco livre. |
+| `Heap::livre_no_fim` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Tamanho do último bloco livre se ele encostar no fim do heap (para crescer só o que falta). |
+| `Heap::alocar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `procurar`; se não achar, `crescer` e tenta de novo; se ainda assim não der, devolve nulo. |
+| `Heap::liberar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Calcula o tamanho real e chama `inserir`. |
+| `AlocadorLista::alloc` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `GlobalAlloc::alloc`: o que `Box`/`Vec` chamam. Trava o heap com as interrupções desligadas e chama `alocar`. |
+| `AlocadorLista::dealloc` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `GlobalAlloc::dealloc`: trava o heap com as interrupções desligadas e chama `liberar`. |
+| `init` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Mapeia o heap inicial e coloca esse espaço como um único bloco livre. |
+| `estatisticas` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Tamanho mapeado, bytes em uso, blocos livres, alocações e liberações (há o método em `Heap` e este atalho global). |
+| `contem` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | O endereço está na faixa já mapeada do heap? |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O capítulo 8 do livro trata do mesmo tema: dar ao kernel um heap para

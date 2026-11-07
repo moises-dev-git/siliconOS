@@ -444,6 +444,32 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `Console::new` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Creates the console from the framebuffer info (address, width, height, pixels per line), with the cursor at the top left. |
+| `Console::cols` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | How many text columns fit on the screen (width in pixels ÷ character width). |
+| `Console::rows` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | How many text rows fit on the screen (height in pixels ÷ character height). |
+| `Console::pixel` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Paints one pixel: computes the offset `y * stride + x` and writes the color (u32) straight into framebuffer memory. |
+| `Console::limpar` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Paints the whole screen with the background color and moves the cursor back to the start. |
+| `Console::desenhar_char` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Draws one character at cell (column, row): for each bit of the 8×16 font glyph, one pixel in the text or background color. |
+| `Console::rolar` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | When the screen is full, copies every pixel row one text line up and clears the last one. |
+| `Console::nova_linha` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Moves the cursor to the start of the next line; if it was already on the last one, calls `rolar`. |
+| `Console::write_byte` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Writes one byte to the screen: `\n` calls `nova_linha`, `\r` returns to column 0; anything else becomes `desenhar_char`, wrapping at the end of the line. (Since doc 08, backspace erases the previous character.) |
+| `Console::write_str` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | `fmt::Write` implementation: passes each byte of the string to `write_byte`. This is what lets `write!` target the console. |
+| `_print` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | What `kprint!`/`kprintln!` call: formats the text and sends it to the serial port and the screen. (Since doc 08 with interrupts off, via `escrever`.) |
+| `Serial::init` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Configures the COM1 UART (port 0x3F8): 38400 baud, 8 bits, no parity, 1 stop bit, FIFOs on, UART interrupts off. |
+| `Serial::write_byte` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Waits for the transmit register to be empty (bit 5 of the status port) and sends one byte. |
+| `Serial::write_str` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | `fmt::Write` implementation for the serial port: sends byte by byte, turning `\n` into `\r\n`. (Since doc 08, backspace becomes "back, space, back".) |
+| `outb` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | The `out` instruction: writes one byte to an I/O port. `unsafe` because a wrong port can do anything to the hardware. |
+| `inb` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | The `in` instruction: reads one byte from an I/O port. |
+
+
+---
+
 ## Difference from the book
 
 The book also shows **VGA text mode**: an old mode in which the graphics

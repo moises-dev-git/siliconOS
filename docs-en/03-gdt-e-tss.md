@@ -533,6 +533,21 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `dpl` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Builds the privilege level bits (DPL, bits 45–46) of a segment descriptor. |
+| `descritor_tss` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Builds the TSS descriptor, which takes two GDT entries (128 bits) because the base is 64 bits wide. |
+| `init` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Fills the TSS (the double-fault IST1 stack and, since doc 10, RSP0), loads the GDT with `lgdt`, switches CS with `retfq`, reloads SS/DS/ES and loads the TSS with `ltr`. |
+| `estado` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Reads back the active GDT (`sgdt`) and the CS, SS, DS and TR selectors, so the boot can show that the switch worked. |
+| `topo_pilha_double_fault` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Address of the top of the IST1 stack (the double-fault one), printed at boot. |
+
+
+---
+
 ## Difference from the book
 
 The book uses the `x86_64` crate, which has ready-made

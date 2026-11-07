@@ -857,6 +857,73 @@ is in the [comparison between the two tags](https://github.com/moises-dev-git/si
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `desligar` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Powers the machine off (S5 state): finds SLP_TYP in the DSDT and writes it with SLP_EN to the FADT's PM1a register. |
+| `tipo_s5` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Searches the DSDT's AML bytes for the `_S5_` object and returns the package's first element (SLP_TYPa). |
+| `reiniciar` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/cpu.rs) | Reboots: RESET pulse through the 8042 (command 0xFE); if that fails, loads an empty IDT and forces a triple fault. |
+| `digitar` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/teclado.rs) | Test helper: runs a sequence of scancodes through the decoder and collects the characters. |
+| `hora_rtc` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/timer.rs) | Hour, minute and second from the CMOS clock, converted from BCD and 12-hour format when needed. |
+| `registrador` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/timer.rs) | (Inner function of `hora_rtc`.) Reads a CMOS register: number to port 0x70, value from 0x71. |
+| `sair` | [qemu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/qemu.rs) | Writes to port 0xF4 of the isa-debug-exit device: QEMU exits with code (value × 2 + 1), 33 = ok, 35 = failure. |
+| `outw` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/serial.rs) | 16-bit `out` instruction (used for the ACPI PM1a register). |
+| `inw` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/serial.rs) | 16-bit `in` instruction. |
+| `Shell::new` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | New shell with an empty line. |
+| `Shell::tecla` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Handles one key: a character goes into the line (up to the limit), backspace deletes, Enter runs it and shows the prompt again. |
+| `rodar` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | The kernel's main loop: takes scancodes from the queue, decodes them, passes them to the shell and sleeps when there is nothing to do. |
+| `executar` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Splits the line into words, looks the first one up in the command table and calls the function with the rest. |
+| `ler_numero` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Parses a decimal or hexadecimal (`0x`) number, accepting `_` as a separator. |
+| `ajuda` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `ajuda` command: lists the commands and their descriptions, taken from the table itself. |
+| `eco` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `eco` command: prints the arguments. |
+| `limpar` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `limpar` command: clears the screen. |
+| `tempo` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `tempo` command: time since boot (from ticks) and the RTC time. |
+| `mem` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `mem` command: free frames and heap statistics (in use, peak, mapped, free blocks). |
+| `cpu_info` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `cpu` command: vendor and model read with `cpuid`. |
+| `int` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `int` command: counters of ticks, keys received/lost and spurious interrupts. |
+| `traduzir` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `traduzir <address>` command: shows the virtual address's translation (via `explicar_traducao`). |
+| `ler` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `ler <address>` command: reads 8 bytes at the address without checking anything (on purpose: `ler 0` shows a page fault). |
+| `reiniciar` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `reiniciar` command: calls `cpu::reiniciar`. |
+| `desligar` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | `desligar` command: calls `acpi::desligar` and waits 20 ticks before saying it failed. |
+| `Testavel::rodar` | [testes.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/testes.rs) | `Testavel::rodar` for every `Fn()`: prints the test name, runs it and prints `[ok]` (if it panics, the handler takes over). |
+
+Automated tests (`#[test_case]`, run with `cargo test`, see doc 09):
+
+| Function | File | What it does |
+|---|---|---|
+| `madt_tem_cpu_e_ioapic` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Test: the MADT lists at least one CPU, the local APIC at 0xFEE0_0000 and an I/O APIC. |
+| `irq_sem_desvio_vai_para_a_mesma_gsi` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Test: IRQ 1 (no override) goes to GSI 1, active high, edge-triggered. |
+| `irq0_desviada_para_gsi2_no_qemu` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Test: on QEMU, IRQ 0 (the PIT) is redirected to GSI 2. |
+| `dsdt_tem_s5` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/acpi.rs) | Test: the FADT points to a valid DSDT, which has the `_S5_` object. |
+| `sem_interrupcoes_restaura_o_estado` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/cpu.rs) | Test: `sem_interrupcoes` clears IF inside and restores it as it was, even when nested. |
+| `msr_do_apic` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/cpu.rs) | Test: MSR 0x1B has base 0xFEE0_0000 and bit 11 (APIC enabled). |
+| `letras_e_numeros` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/teclado.rs) | Test: pressing and releasing A, 1 and space gives "a1 " (releases produce nothing). |
+| `shift_e_caps_lock` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/teclado.rs) | Test: Shift and Caps Lock change case and symbols. |
+| `teclas_estendidas_ignoradas` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/teclado.rs) | Test: keys with the 0xE0 prefix produce no character. |
+| `enter_e_backspace` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/teclado.rs) | Test: Enter becomes `\n` and Backspace becomes `\x08`. |
+| `tiques_avancam` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/timer.rs) | Test: waiting with `hlt`, 3 ticks arrive and `milissegundos()` goes past 30. |
+| `hora_rtc_valida` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/interrupcoes/timer.rs) | Test: the RTC time is within valid ranges (0–23, 0–59, 0–59). |
+| `alinhar_acima_arredonda` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/heap.rs) | Test: `alinhar_acima` with several values. |
+| `box_mora_no_heap` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/heap.rs) | Test: a `Box`'s address is inside the heap. |
+| `sem_vazamento_e_blocos_juntados` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/heap.rs) | Test: allocates 1000 `Box`es, frees half (leaving holes), then the rest; bytes in use and the free block count go back to the start. |
+| `pagina_zero_nao_mapeada` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/paginacao.rs) | Test: page 0 is not mapped (a null pointer gives a page fault). |
+| `metade_alta_mostra_a_ram` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/paginacao.rs) | Test: the upper-half address + 0x20_0000 translates to physical 0x20_0000. |
+| `mapear_e_desmapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/paginacao.rs) | Test: maps a page, writes through it, reads the same value through the physical frame, unmaps it and the translation is gone. |
+| `erros_de_mapeamento` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/paginacao.rs) | Test: non-canonical and unaligned addresses are rejected with the right error. |
+| `alocar_e_liberar_devolve_a_contagem` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/memoria/quadros.rs) | Test: allocating and freeing brings the free count back to its starting value. |
+| `ler_numero_decimal_e_hexadecimal` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Test: `ler_numero` with decimals, hexadecimals, separators and invalid input. |
+| `editar_linha` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Test: typing, deleting with backspace (even more times than letters) and an ignored Tab leave the right line. |
+| `linha_tem_limite` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Test: the line does not grow past the maximum size. |
+| `nomes_de_comandos_unicos` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/shell.rs) | Test: no two commands in the table share a name. |
+| `executar` | [testes.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/testes.rs) | The `test_runner`: receives the list generated by the compiler, runs each test and exits QEMU with success. |
+| `este_teste_falha` | [testes.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-09/src/testes.rs) | Test that fails on purpose (`teste-que-falha` feature), to show what a failure looks like. |
+
+
+---
+
 ## Difference from the book
 
 Chapter 10 of the book covers an interactive shell, tests in QEMU and

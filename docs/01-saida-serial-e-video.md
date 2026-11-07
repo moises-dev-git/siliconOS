@@ -438,6 +438,32 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `Console::new` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Cria o console a partir das informações do framebuffer (endereço, largura, altura, pixels por linha), com o cursor no canto superior esquerdo. |
+| `Console::cols` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Quantas colunas de texto cabem na tela (largura em pixels ÷ largura de um caractere). |
+| `Console::rows` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Quantas linhas de texto cabem na tela (altura em pixels ÷ altura de um caractere). |
+| `Console::pixel` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Pinta um pixel: calcula o deslocamento `y * stride + x` e escreve a cor (u32) direto na memória do framebuffer. |
+| `Console::limpar` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Pinta a tela inteira com a cor de fundo e volta o cursor para o início. |
+| `Console::desenhar_char` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Desenha um caractere na célula (coluna, linha): para cada bit do glifo da fonte 8×16, um pixel na cor do texto ou do fundo. |
+| `Console::rolar` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Quando a tela enche, copia todas as linhas de pixels uma linha de texto para cima e apaga a última. |
+| `Console::nova_linha` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Leva o cursor ao começo da linha seguinte; se já estava na última, chama `rolar`. |
+| `Console::write_byte` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Escreve um byte na tela: `\n` chama `nova_linha`, `\r` volta à coluna 0; os outros viram `desenhar_char`, quebrando a linha no fim. (Desde o doc 08, backspace apaga o caractere anterior.) |
+| `Console::write_str` | [console.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/console.rs) | Implementação de `fmt::Write`: passa cada byte da string para `write_byte`. É o que permite usar `write!` com o console. |
+| `_print` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | O que `kprint!`/`kprintln!` chamam: formata o texto e o envia à serial e à tela. (Desde o doc 08, com as interrupções desligadas, via `escrever`.) |
+| `Serial::init` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Configura a UART COM1 (porta 0x3F8): 38400 baud, 8 bits, sem paridade, 1 stop bit, FIFOs ligadas, interrupções da UART desligadas. |
+| `Serial::write_byte` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Espera o registrador de transmissão esvaziar (bit 5 da porta de status) e envia um byte. |
+| `Serial::write_str` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Implementação de `fmt::Write` para a serial: envia byte a byte, convertendo `\n` em `\r\n`. (Desde o doc 08, backspace vira "volta, espaço, volta".) |
+| `outb` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Instrução `out`: escreve um byte numa porta de E/S. `unsafe` porque uma porta errada pode fazer qualquer coisa com o hardware. |
+| `inb` | [serial.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/serial.rs) | Instrução `in`: lê um byte de uma porta de E/S. |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O livro também mostra o **modo texto VGA**: um modo antigo em que a placa de

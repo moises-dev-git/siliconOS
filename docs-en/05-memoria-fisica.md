@@ -641,6 +641,43 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `imprimir_mapa` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Prints the memory map summary (per kind) and where the kernel, the stack and the framebuffer are. |
+| `imprimir_alocador` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Prints the bitmap's size and address and how many frames are free. |
+| `testes_de_memoria` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Frame allocator tests chosen by the feature (`teste-quadros`, `teste-liberacao-dupla`). |
+| `Tipo::de_uefi` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Converts the UEFI memory type (about 15 kinds) into the few kinds the kernel cares about (Free, Kernel, ACPI, MMIO, Reserved...). |
+| `Tipo::nome` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Readable name of the kind, for printing. |
+| `Regiao::fim` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | First physical address after the region (start + frames × 4096). |
+| `Regiao::contem` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Is the physical address inside this region? |
+| `Mapa::regioes` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | The valid regions, as a slice (`&[Regiao]`) of the fixed array. |
+| `Mapa::encontrar` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Which region a physical address is in (if any). |
+| `Mapa::total` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Adds up the frames and counts the regions of one kind (for the boot summary). |
+| `Mapa::fim_da_ram` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Highest RAM address (ignores MMIO and Reserved): how far the allocator's bitmap must reach. |
+| `init` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Copies the UEFI map into the kernel's format (merging neighboring regions of the same kind). Only does work on the first call. |
+| `get` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Returns the already initialized map (used by later code, such as the allocator). |
+| `AlocadorQuadros::alocar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Searches the bitmap, from the last word used, for the first 64-bit word that is not full; `trailing_ones` gives the free bit, which is marked and returned. |
+| `AlocadorQuadros::liberar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Clears the frame's bit and moves the search position back if needed; an unaligned address, one outside RAM, or one already free (double free) panics. |
+| `AlocadorQuadros::livres` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Counter of free frames. |
+| `Quadro::endereco` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Physical address of the frame. |
+| `Quadro::indice` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Frame number (address ÷ 4096): its position in the bitmap. |
+| `AlocadorQuadros::ocupado` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Reads the frame's bit in the bitmap (1 = in use). |
+| `AlocadorQuadros::marcar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Sets or clears a frame's bit in the bitmap. |
+| `AlocadorQuadros::marcar_intervalo` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Marks `n` consecutive frames as free or in use. |
+| `AlocadorQuadros::total` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | How many frames the bitmap covers. |
+| `init` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Creates the allocator: puts the bitmap in the first free region above 1 MiB where it fits, marks everything as used, frees the free regions above 1 MiB and protects the bitmap itself. |
+| `reposicionar_bitmap` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Switches to accessing the bitmap through another virtual address; called when paging switches to the kernel's tables. |
+| `alocar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Global shortcut: locks the allocator's `Mutex` and calls `AlocadorQuadros::alocar`. |
+| `liberar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Global shortcut for `AlocadorQuadros::liberar`. |
+| `livres` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Global shortcut for `AlocadorQuadros::livres`. |
+
+
+---
+
 ## Difference from the book
 
 The book receives the memory map from the **bootloader** it uses, in that

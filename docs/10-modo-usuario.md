@@ -1067,6 +1067,47 @@ fn rodar_programa(argumentos: &[&str]) {
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `topo_pilha_anel0` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/gdt.rs) | Topo da pilha que a CPU usa ao vir do anel 3 (TSS.rsp[0]). |
+| `Entrada::para_usuario` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/idt.rs) | Muda o DPL da entrada para 3 (tipo 0xEE), para que `int 0x80` funcione a partir do anel 3. |
+| `programas` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/shell.rs) | Comando `programas`: lista os programas embutidos e seus tamanhos. |
+| `rodar_programa` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/shell.rs) | Comando `rodar <programa>`: roda no anel 3 e mostra o resultado (código de saída, falha ou tempo esgotado). |
+| `rodar` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Mapeia código e pilha do programa com o bit USUARIO, entra no anel 3, e quando ele termina desmapeia tudo, libera os quadros e devolve o `Resultado`. |
+| `nova_pagina_zerada` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Aloca um quadro e o zera (para o programa não ver lixo de quem usou o quadro antes). |
+| `encerrar` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Guarda o resultado e pula para `voltar_ao_kernel`; chamada de dentro de um tratador, nunca retorna. |
+| `falha_do_programa` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Chamada pelos tratadores de exceção: se CS indica anel 3, imprime a falha e encerra o programa; senão retorna e o tratador dá panic. |
+| `tempo_esgotado` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Chamada pelo timer: o tique interrompeu o anel 3 e o programa já passou de `LIMITE_TIQUES`? |
+| `entrar_no_anel3` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Salva os registradores do kernel e o RSP, monta à mão um quadro de interrupção (SS, RSP, RFLAGS, CS, RIP do programa) e executa `iretq`. |
+| `voltar_ao_kernel` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Restaura o RSP salvo por `entrar_no_anel3`, desempilha os registradores e faz `ret`: parece que `entrar_no_anel3` retornou. |
+| `entrada_syscall` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Tratador do vetor 0x80: empilha os registradores numa `Registros`, chama `tratar_syscall` e volta com `iretq`. |
+| `tratar_syscall` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Despacha pelo número em rax: `sair`, `escrever` ou `tiques`; número desconhecido devolve -38. |
+| `faixa_do_programa` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Confere se um ponteiro + tamanho vindo do programa está inteiro dentro das páginas dele (sem estouro de soma). |
+| `escrever` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | A syscall `escrever`: valida o ponteiro, imprime os bytes e devolve quantos foram escritos (ou -14). |
+| `rodar_por_nome` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Ajudante dos testes: procura o programa pelo nome e o roda. |
+| `Programa::codigo` | [usuario/programas.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/programas.rs) | Os bytes de máquina do programa (uma fatia de `.rdata` entre dois rótulos). |
+| `procurar` | [usuario/programas.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/programas.rs) | Procura um programa embutido pelo nome. |
+
+Testes automáticos (`#[test_case]`, rodam com `cargo test`, ver doc 09):
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `ola_sai_com_42` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `ola` escreve e sai com 42. |
+| `relogio_usa_syscall_de_tiques` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `relogio` espera 100 tiques pela syscall e sai com 100. |
+| `ponteiro_do_kernel_recusado` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `ponteiro` passa um endereço do kernel, recebe -14 e sai com 1. |
+| `invasor_encerrado_por_page_fault` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `invasor` (lê memória do kernel) termina por #PF. |
+| `privilegiado_encerrado_por_gp` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `privilegiado` (`cli` no anel 3) termina por #GP. |
+| `laco_encerrado_pelo_timer` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `laco` (laço infinito) é encerrado pelo timer. |
+| `nada_fica_mapeado_nem_vaza` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: depois de um aquecimento, rodar `ola` deixa os endereços do programa desmapeados e os quadros livres no mesmo número. |
+| `validacao_de_ponteiros` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Teste: `faixa_do_programa` aceita e recusa os casos de borda certos. |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O livro termina no capítulo 11, e a seção 11.4 traça um roteiro: disco em

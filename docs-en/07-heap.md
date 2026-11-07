@@ -754,6 +754,36 @@ is in the [comparison between the two tags](https://github.com/moises-dev-git/si
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `demonstrar_heap` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | On a normal boot, uses `Box`, `Vec` and `String` and prints where they live: proof that the heap works. |
+| `testes_de_heap` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/main.rs) | Heap tests chosen by the feature (`teste-heap`, `teste-heap-liberacao-dupla`, `teste-heap-esgotar`...). |
+| `AlocadorBump::alloc` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Bump allocator: aligns the pointer, advances it by the requested size and returns the start. Never reuses anything. |
+| `AlocadorBump::dealloc` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Only counts the free: a bump allocator cannot give memory back. |
+| `init` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Maps the heap range for the bump allocator (used only with the `teste-bump` feature). |
+| `estado` | [memoria/bump.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/bump.rs) | Bytes consumed, allocations and frees of the bump allocator (to compare with the real heap). |
+| `alinhar_acima` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Rounds a number up to the next multiple of a power of 2. |
+| `mapear_faixa` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Maps a range of pages, each on a new frame, with WRITE and NO_EXECUTE; returns how many bytes it managed. |
+| `tamanho_real` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Size the heap actually reserves: a multiple of 16 and never smaller than a `NoLivre`. |
+| `Heap::procurar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | First fit: walks the list and carves the first free block where the request fits aligned; the leftovers go back to the list. |
+| `Heap::inserir` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Returns a block to the list in address order and merges it with touching neighbors; detects double frees. |
+| `Heap::crescer` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Maps more pages at the end of the heap (up to the limit) and inserts them as a free block. |
+| `Heap::livre_no_fim` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Size of the last free block if it touches the end of the heap (so growing only adds what is missing). |
+| `Heap::alocar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `procurar`; if nothing is found, `crescer` and try again; if that still fails, returns null. |
+| `Heap::liberar` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Computes the real size and calls `inserir`. |
+| `AlocadorLista::alloc` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `GlobalAlloc::alloc`: what `Box`/`Vec` call. Locks the heap with interrupts off and calls `alocar`. |
+| `AlocadorLista::dealloc` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | `GlobalAlloc::dealloc`: locks the heap with interrupts off and calls `liberar`. |
+| `init` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Maps the initial heap and adds that space as a single free block. |
+| `estatisticas` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Mapped size, bytes in use, free blocks, allocations and frees (there is the method on `Heap` and this global shortcut). |
+| `contem` | [memoria/heap.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-07/src/memoria/heap.rs) | Is the address in the heap's already mapped range? |
+
+
+---
+
 ## Difference from the book
 
 Chapter 8 of the book deals with the same topic: giving the kernel a heap

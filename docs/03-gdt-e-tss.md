@@ -527,6 +527,21 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `dpl` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Monta os bits de nível de privilégio (DPL, bits 45–46) de um descritor de segmento. |
+| `descritor_tss` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Monta o descritor de TSS, que ocupa duas entradas da GDT (128 bits) porque a base tem 64 bits. |
+| `init` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Preenche a TSS (pilha IST1 do double fault e, desde o doc 10, RSP0), carrega a GDT com `lgdt`, troca o CS com `retfq`, recarrega SS/DS/ES e carrega a TSS com `ltr`. |
+| `estado` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Lê de volta a GDT ativa (`sgdt`) e os seletores CS, SS, DS e TR, para o boot mostrar que a troca funcionou. |
+| `topo_pilha_double_fault` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/gdt.rs) | Endereço do topo da pilha IST1 (a do double fault), para imprimir no boot. |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O livro usa a crate `x86_64`, que tem `GlobalDescriptorTable` e

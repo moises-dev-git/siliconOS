@@ -643,6 +643,40 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `explicar_traducao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Prints the 4 indices of a virtual address and the translation result (used at boot and by the `traduzir` command). |
+| `testes_de_paginacao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Paging tests chosen by the feature (`teste-paginacao`, `teste-desmapeado`, `teste-nulo`). |
+| `fisico_para_virtual` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Converts a physical address into the virtual address the kernel can reach it through right now (identical before the table switch; physical + 0xFFFF_8000_0000_0000 after). |
+| `Entrada::presente` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Does the entry have the P (present) bit? |
+| `Entrada::grande` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Does the entry have the PS bit, i.e. map a 2 MiB or 1 GiB page instead of pointing to another table? |
+| `Entrada::endereco` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | The physical address stored in the entry (bits 12–51). |
+| `Entrada::flags` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Only the entry's control bits (everything but the address). |
+| `tabela_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Gives access, as `&mut Tabela`, to the page table at the given physical address (via `fisico_para_virtual`). |
+| `nova_tabela` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Takes a free frame and zeroes it: a new table with no entries. |
+| `indices` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | The four 9-bit indices a virtual address selects (PML4, PDPT, PD, PT). |
+| `canonico` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Is the address canonical (bits 48–63 equal to bit 47)? |
+| `TamanhoPagina::bytes` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Page size in bytes (4 KiB, 2 MiB or 1 GiB). |
+| `TamanhoPagina::nome` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Readable name of the size, for printing. |
+| `TamanhoPagina::nivel_folha` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Which level holds the final entry for this page size (PT for 4 KiB, PD for 2 MiB, PDPT for 1 GiB). |
+| `traduzir_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Does by hand what the CPU does: walks the tables from a PML4 and returns the physical address, size and flags (or `None`). |
+| `raiz_atual` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Physical address of the active PML4 (CR3 without the control bits). |
+| `traduzir` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `traduzir_em` using the active PML4. |
+| `mapear_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Maps virtual → physical in a hierarchy, creating any missing intermediate tables; rejects unaligned, non-canonical or already mapped addresses. |
+| `desmapear_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Removes the mapping and returns the physical address it used (empty intermediate tables stay). |
+| `mapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `mapear_em` on the active PML4, followed by `invalidar`. |
+| `desmapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `desmapear_em` on the active PML4, followed by `invalidar`. |
+| `invalidar` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `invlpg`: drops one address from the TLB so the CPU does not use the old translation. |
+| `init` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Builds the kernel's tables (first 2 MiB in 4 KiB pages without page 0; all RAM in 2 MiB pages, identity-mapped and in the upper half; the framebuffer), switches CR3 and starts using the upper half. |
+| `alocar_e_mapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Shortcut for tests: allocates a frame and maps it at the given virtual address. |
+
+
+---
+
 ## Difference from the book
 
 Judging by its table of contents, chapter 7 of the book covers the same

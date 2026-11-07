@@ -649,6 +649,27 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `Entrada::new` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Creates an IDT entry (interrupt gate, DPL 0, present) pointing at the handler, with the chosen IST stack (0 = none). |
+| `QuadroInterrupcao::fmt` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | `Display` implementation for `QuadroInterrupcao`: prints the RIP, CS, RFLAGS, RSP and SS the CPU pushed. |
+| `init` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Fills the table with the exception handlers and loads it with `lidt`. (Docs 08 and 10 add the timer, keyboard, spurious and `int 0x80` entries.) |
+| `estado` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Base and limit of the active IDT, read with `sidt` (boot diagnostics). |
+| `breakpoint` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #BP (`int3`) handler: prints the frame and lets execution continue at the next instruction. |
+| `divisao` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #DE (divide by zero) handler: prints the frame and panics. (Since doc 10, if it came from ring 3, it only kills the program.) |
+| `opcode_invalido` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #UD (invalid opcode) handler: prints the frame and panics. (Since doc 10, it only kills the program if it came from ring 3.) |
+| `protecao_geral` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #GP handler: shows the error code (the selector involved, if any) and panics. (Since doc 10, it only kills the program if it came from ring 3.) |
+| `page_fault` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #PF handler: reads the faulting address from CR2, decodes the error code (present/write/user/fetch) and panics. (Since doc 10, it only kills the program if it came from ring 3.) |
+| `double_fault` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | #DF handler, running on the IST1 stack (works even if the normal stack is destroyed). There is no way to continue: prints and panics. |
+| `testes_de_excecao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Deliberately triggers the exception chosen by the feature (`teste-breakpoint`, `teste-divisao`, `teste-gpf`...). |
+
+
+---
+
 ## Difference from the book
 
 The book uses the `x86_64` crate, which has ready-made

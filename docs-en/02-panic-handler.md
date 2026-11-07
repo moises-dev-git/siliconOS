@@ -282,6 +282,19 @@ end of doc 06**, which may already contain what later chapters add.
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `panic` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | The `#[panic_handler]`: turns interrupts off, detects a panic inside a panic, writes the details to serial and screen (red background, force-unlocking the console) and halts. (Since doc 09, under `cargo test`, it exits QEMU with the failure code.) |
+| `escrever_detalhes` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | Writes the panic's message, file, line and column to any destination that implements `Write` (called twice: serial and screen). |
+| `parar` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | Endless `cli; hlt` loop: the CPU sleeps and never wakes up again. |
+
+
+---
+
 ## Summary
 
 - A **panic** is a logic error in the program (invalid index, `unwrap` on

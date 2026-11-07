@@ -615,6 +615,43 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `imprimir_mapa` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Imprime o resumo do mapa de memória (por tipo) e onde estão o kernel, a pilha e o framebuffer. |
+| `imprimir_alocador` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Imprime o tamanho e o endereço do bitmap e quantos quadros estão livres. |
+| `testes_de_memoria` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Testes do alocador de quadros escolhidos pela feature (`teste-quadros`, `teste-liberacao-dupla`). |
+| `Tipo::de_uefi` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Converte o tipo de memória do UEFI (uns 15 tipos) para os poucos tipos que o kernel distingue (Livre, Kernel, ACPI, MMIO, Reservada...). |
+| `Tipo::nome` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Nome legível do tipo, para imprimir. |
+| `Regiao::fim` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Primeiro endereço físico depois da região (início + quadros × 4096). |
+| `Regiao::contem` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | O endereço físico está dentro desta região? |
+| `Mapa::regioes` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | As regiões válidas, como uma fatia (`&[Regiao]`) do array fixo. |
+| `Mapa::encontrar` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Em que região está um endereço físico (se estiver em alguma). |
+| `Mapa::total` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Soma os quadros e conta as regiões de um tipo (para o resumo do boot). |
+| `Mapa::fim_da_ram` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Maior endereço de RAM (ignora MMIO e Reservada): até onde o bitmap do alocador precisa ir. |
+| `init` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Copia o mapa do UEFI para o formato do kernel (juntando regiões vizinhas do mesmo tipo). Só trabalha na primeira chamada. |
+| `get` | [memoria/mapa.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/mapa.rs) | Devolve o mapa já inicializado (usado por quem vem depois, como o alocador). |
+| `AlocadorQuadros::alocar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Procura no bitmap, a partir da última palavra usada, a primeira palavra de 64 bits que não está cheia; `trailing_ones` dá o bit livre, que é marcado e devolvido. |
+| `AlocadorQuadros::liberar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Desmarca o quadro e recua a posição de busca se preciso; endereço desalinhado, fora da RAM ou já livre (liberação dupla) dá panic. |
+| `AlocadorQuadros::livres` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Contador de quadros livres. |
+| `Quadro::endereco` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Endereço físico do quadro. |
+| `Quadro::indice` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Número do quadro (endereço ÷ 4096): a posição dele no bitmap. |
+| `AlocadorQuadros::ocupado` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Lê o bit do quadro no bitmap (1 = ocupado). |
+| `AlocadorQuadros::marcar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Liga ou desliga o bit de um quadro no bitmap. |
+| `AlocadorQuadros::marcar_intervalo` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Marca `n` quadros seguidos como livres ou ocupados. |
+| `AlocadorQuadros::total` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Quantos quadros o bitmap cobre. |
+| `init` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Cria o alocador: põe o bitmap na primeira região livre acima de 1 MiB onde ele cabe, marca tudo como ocupado, libera as regiões livres acima de 1 MiB e protege o próprio bitmap. |
+| `reposicionar_bitmap` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Passa a acessar o bitmap por outro endereço virtual; chamada quando a paginação troca para as tabelas do kernel. |
+| `alocar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Atalho global: trava o `Mutex` do alocador e chama `AlocadorQuadros::alocar`. |
+| `liberar` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Atalho global para `AlocadorQuadros::liberar`. |
+| `livres` | [memoria/quadros.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/quadros.rs) | Atalho global para `AlocadorQuadros::livres`. |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O livro recebe o mapa de memória do **bootloader** que ele usa, num formato

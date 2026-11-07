@@ -630,6 +630,27 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `Entrada::new` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Cria uma entrada da IDT (interrupt gate, DPL 0, presente) apontando para o tratador, com a pilha IST escolhida (0 = nenhuma). |
+| `QuadroInterrupcao::fmt` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Implementação de `Display` para `QuadroInterrupcao`: imprime RIP, CS, RFLAGS, RSP e SS que a CPU empilhou. |
+| `init` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Preenche a tabela com os tratadores de exceção e a carrega com `lidt`. (Os docs 08 e 10 acrescentam timer, teclado, espúrias e `int 0x80`.) |
+| `estado` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Base e limite da IDT ativa, lidos com `sidt` (diagnóstico do boot). |
+| `breakpoint` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #BP (`int3`): imprime o quadro e deixa a execução continuar na instrução seguinte. |
+| `divisao` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #DE (divisão por zero): imprime o quadro e dá panic. (Desde o doc 10, se veio do anel 3, encerra só o programa.) |
+| `opcode_invalido` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #UD (instrução inválida): imprime o quadro e dá panic. (Desde o doc 10, encerra só o programa se veio do anel 3.) |
+| `protecao_geral` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #GP: mostra o código de erro (o seletor envolvido, se houver) e dá panic. (Desde o doc 10, encerra só o programa se veio do anel 3.) |
+| `page_fault` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #PF: lê o endereço culpado em CR2, decodifica o código de erro (presente/escrita/usuário/execução) e dá panic. (Desde o doc 10, encerra só o programa se veio do anel 3.) |
+| `double_fault` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/idt.rs) | Tratador do #DF, rodando na pilha IST1 (funciona mesmo com a pilha normal destruída). Não há como continuar: imprime e dá panic. |
+| `testes_de_excecao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Provoca de propósito a exceção escolhida pela feature (`teste-breakpoint`, `teste-divisao`, `teste-gpf`...). |
+
+
+---
+
 ## Diferença em relação ao livro
 
 O livro usa a crate `x86_64`, que tem `InterruptDescriptorTable` e

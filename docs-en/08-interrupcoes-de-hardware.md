@@ -1185,6 +1185,65 @@ is in the [comparison between the two tags](https://github.com/moises-dev-git/si
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `guardar_rsdp` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Takes the RSDP (ACPI 2.0) address from the UEFI configuration table and stores it; must run before `exit_boot_services`. |
+| `ler` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Reads a value of any type at a physical address without requiring alignment (`read_unaligned`). |
+| `checksum_ok` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Checks the ACPI checksum: all bytes added up (with wrap-around) give zero. |
+| `Madt::rotear_irq` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Which GSI an ISA IRQ goes to, and with which polarity and trigger mode, applying the MADT's overrides. |
+| `madt` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Reads the MADT on the first call and always returns the same copy. |
+| `procurar_tabela` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Validates the RSDP and the XSDT (signature and checksum) and walks the XSDT looking for the table with the given signature ("APIC", "FACP"...). |
+| `ler_madt` | [acpi.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/acpi.rs) | Parses the MADT entries: local APICs, I/O APICs and IRQ overrides. |
+| `ligar_interrupcoes` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | `sti`: the CPU starts accepting hardware interrupts. |
+| `desligar_interrupcoes` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | `cli`: hardware interrupts are held pending. |
+| `interrupcoes_ligadas` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | Reads the IF bit of RFLAGS. |
+| `sem_interrupcoes` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | Runs a closure with interrupts off and restores IF afterwards; protects anything a handler also uses. |
+| `ler_msr` | [cpu.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/cpu.rs) | `rdmsr`: reads a model-specific register (MSR) by number. |
+| `ler` | [interrupcoes/apic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | Reads a 32-bit local APIC register (MMIO at the given offset). |
+| `escrever` | [interrupcoes/apic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | Writes a local APIC register. |
+| `eoi` | [interrupcoes/apic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | Writes 0 to the EOI register: "done". Without it, no interrupt of equal or lower priority arrives. |
+| `id` | [interrupcoes/apic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | This APIC's number (this CPU's), used as the destination in the I/O APIC. |
+| `init` | [interrupcoes/apic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/apic.rs) | Reads MSR 0x1B, maps the registers, sets the priority to zero, masks LINT0 (where the 8259 would come in) and enables the APIC with the spurious vector. |
+| `ler` | [interrupcoes/ioapic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | Reads an I/O APIC register: writes the number to IOREGSEL and reads IOWIN. |
+| `escrever` | [interrupcoes/ioapic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | Writes an I/O APIC register through the same IOREGSEL/IOWIN pair. |
+| `init` | [interrupcoes/ioapic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | Maps the I/O APIC, reads how many pins it has and masks them all. |
+| `rotear` | [interrupcoes/ioapic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | Programs a pin's redirection entry: vector, destination CPU, polarity and trigger mode, unmasked. |
+| `entrada` | [interrupcoes/ioapic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/ioapic.rs) | A pin's current redirection entry (diagnostics). |
+| `espurias` | [interrupcoes/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/mod.rs) | How many spurious interrupts have arrived. |
+| `espuria` | [interrupcoes/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/mod.rs) | Spurious interrupt handler (8259 and APIC): only counts, no EOI. |
+| `init` | [interrupcoes/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/mod.rs) | The whole sequence: disables the 8259, enables the local APIC and the I/O APIC, calibrates and starts the timer, routes the keyboard and runs `sti`. |
+| `esperar` | [interrupcoes/pic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/pic.rs) | Writes to port 0x80 just to spend ~1 µs between 8259 commands. |
+| `desligar` | [interrupcoes/pic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/pic.rs) | Remaps both 8259s to 0x20–0x2F (so they do not collide with exceptions) and masks every IRQ. |
+| `recebidos` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | How many scancodes the handler has received. |
+| `perdidos` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | How many scancodes were dropped because the queue was full. |
+| `tratador` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Vector 0x31 handler: reads the scancode from port 0x60, queues it (or counts it as lost) and sends EOI. |
+| `proximo_scancode` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Takes the next scancode from the queue (the consumer side of the SPSC queue). |
+| `fila_vazia` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Is the queue empty? (compares the read and write indices). |
+| `esperar` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Sleeps with `hlt` if the queue is empty, using `cli; test; sti; hlt` so a key arriving in between is not lost. |
+| `enviar_comando` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Waits for the 8042 input buffer to empty and writes a command to port 0x64. |
+| `enviar_dado` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Waits for the input buffer to empty and writes a data byte to port 0x60. |
+| `ler_dado` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Waits for the output buffer to fill and reads a byte from port 0x60. |
+| `init` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Discards stale bytes, reads the 8042 configuration, sets the IRQ 1 bit and writes it back. |
+| `Decodificador::new` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | New decoder: Shift and Caps Lock off. |
+| `Decodificador::processar` | [interrupcoes/teclado.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/teclado.rs) | Translates a set-1 scancode into a character (US layout), tracking Shift, Caps Lock and the 0xE0 prefix. |
+| `tiques` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | How many ticks (of 10 ms) since the timer was started. |
+| `milissegundos` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | Ticks × 10. |
+| `tratador` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | Vector 0x30 handler: adds a tick, sends EOI (and, since doc 10, kills a ring-3 program that went over the limit). |
+| `calibrar` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | Measures how much the APIC timer counts in 10 ms, using PIT channel 2 as a stopwatch. |
+| `iniciar` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | Starts the APIC timer in periodic mode on the given vector with the calibrated count. |
+| `segundos_rtc` | [interrupcoes/timer.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/interrupcoes/timer.rs) | Reads the seconds of the CMOS clock (RTC) by polling, to check the timer. |
+| `escrever` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | The part of `_print` that actually writes (serial and screen), running inside `sem_interrupcoes`. |
+| `ecoar_teclado` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | The doc 08 main loop: sleeps, and each key that arrives is translated and shown (doc 09 replaces it with the shell). |
+| `testes_de_interrupcoes` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/main.rs) | Tests chosen by the feature (`teste-timer`, `teste-sem-eoi`, `teste-print-interrupcao`, `teste-deadlock`). |
+| `mapear_mmio` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-08/src/memoria/paginacao.rs) | Maps device registers in the MMIO_INICIO range, with WRITE, NO_CACHE and NO_EXECUTE, and returns the virtual address. |
+
+
+---
+
 ## Difference from the book
 
 Chapter 9 of the book covers the same topic: having the hardware notify

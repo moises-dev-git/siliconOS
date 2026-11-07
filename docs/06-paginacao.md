@@ -625,6 +625,40 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `explicar_traducao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Imprime os 4 índices de um endereço virtual e o resultado da tradução (usado no boot e no comando `traduzir`). |
+| `testes_de_paginacao` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Testes de paginação escolhidos pela feature (`teste-paginacao`, `teste-desmapeado`, `teste-nulo`). |
+| `fisico_para_virtual` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Converte um endereço físico no virtual por onde o kernel o enxerga agora (igual antes da troca de tabelas; físico + 0xFFFF_8000_0000_0000 depois). |
+| `Entrada::presente` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | A entrada tem o bit P (presente)? |
+| `Entrada::grande` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | A entrada tem o bit PS, ou seja, mapeia uma página de 2 MiB ou 1 GiB em vez de apontar para outra tabela? |
+| `Entrada::endereco` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | O endereço físico guardado na entrada (bits 12–51). |
+| `Entrada::flags` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Só os bits de controle da entrada (tudo menos o endereço). |
+| `tabela_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Dá acesso, como `&mut Tabela`, à tabela de página que está no endereço físico informado (via `fisico_para_virtual`). |
+| `nova_tabela` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Pega um quadro livre e o zera: uma tabela nova sem nenhuma entrada. |
+| `indices` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Os 4 índices de 9 bits que um endereço virtual escolhe (PML4, PDPT, PD, PT). |
+| `canonico` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | O endereço é canônico (bits 48–63 iguais ao bit 47)? |
+| `TamanhoPagina::bytes` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Tamanho da página em bytes (4 KiB, 2 MiB ou 1 GiB). |
+| `TamanhoPagina::nome` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Nome legível do tamanho, para imprimir. |
+| `TamanhoPagina::nivel_folha` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Em que nível fica a entrada final para este tamanho de página (PT para 4 KiB, PD para 2 MiB, PDPT para 1 GiB). |
+| `traduzir_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Faz à mão o que a CPU faz: percorre as tabelas a partir de uma PML4 e devolve o físico, o tamanho e as flags (ou `None`). |
+| `raiz_atual` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Endereço físico da PML4 ativa (CR3 sem os bits de controle). |
+| `traduzir` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `traduzir_em` com a PML4 ativa. |
+| `mapear_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Mapeia virtual → físico numa hierarquia, criando as tabelas intermediárias que faltarem; recusa endereço desalinhado, não canônico ou já mapeado. |
+| `desmapear_em` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Remove o mapeamento e devolve o físico que ele usava (as tabelas intermediárias vazias ficam). |
+| `mapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `mapear_em` na PML4 ativa, seguido de `invalidar`. |
+| `desmapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `desmapear_em` na PML4 ativa, seguido de `invalidar`. |
+| `invalidar` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | `invlpg`: tira um endereço da TLB, para a CPU não usar a tradução antiga. |
+| `init` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Monta as tabelas do kernel (primeiros 2 MiB em páginas de 4 KiB sem a página 0; toda a RAM em 2 MiB em identidade e na metade alta; o framebuffer), troca o CR3 e passa a usar a metade alta. |
+| `alocar_e_mapear` | [memoria/paginacao.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/memoria/paginacao.rs) | Atalho para testes: aloca um quadro e o mapeia no endereço virtual dado. |
+
+
+---
+
 ## Diferença em relação ao livro
 
 Pelo sumário, o capítulo 7 do livro trata dos mesmos temas: páginas, quadros

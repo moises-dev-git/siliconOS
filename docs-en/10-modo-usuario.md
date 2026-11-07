@@ -1104,6 +1104,47 @@ fn rodar_programa(argumentos: &[&str]) {
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `topo_pilha_anel0` | [gdt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/gdt.rs) | Top of the stack the CPU uses when coming from ring 3 (TSS.rsp[0]). |
+| `Entrada::para_usuario` | [idt.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/idt.rs) | Changes the entry's DPL to 3 (type 0xEE) so that `int 0x80` works from ring 3. |
+| `programas` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/shell.rs) | `programas` command: lists the built-in programs and their sizes. |
+| `rodar_programa` | [shell.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/shell.rs) | `rodar <program>` command: runs it in ring 3 and shows the result (exit code, fault or timeout). |
+| `rodar` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Maps the program's code and stack with the USER bit, enters ring 3, and when it ends unmaps everything, frees the frames and returns the `Resultado`. |
+| `nova_pagina_zerada` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Allocates a frame and zeroes it (so the program does not see leftovers from the frame's previous user). |
+| `encerrar` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Stores the result and jumps to `voltar_ao_kernel`; called from inside a handler, never returns. |
+| `falha_do_programa` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Called by the exception handlers: if CS says ring 3, prints the fault and kills the program; otherwise returns and the handler panics. |
+| `tempo_esgotado` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Called by the timer: did the tick interrupt ring 3, and is the program past `LIMITE_TIQUES`? |
+| `entrar_no_anel3` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Saves the kernel's registers and RSP, builds an interrupt frame by hand (the program's SS, RSP, RFLAGS, CS, RIP) and runs `iretq`. |
+| `voltar_ao_kernel` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Restores the RSP saved by `entrar_no_anel3`, pops the registers and does `ret`: it looks as if `entrar_no_anel3` returned. |
+| `entrada_syscall` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | (naked) Vector 0x80 handler: pushes the registers into a `Registros`, calls `tratar_syscall` and returns with `iretq`. |
+| `tratar_syscall` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Dispatches on the number in rax: `sair`, `escrever` or `tiques`; an unknown number returns -38. |
+| `faixa_do_programa` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Checks that a pointer + length from the program lies entirely within its pages (with no overflow in the addition). |
+| `escrever` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | The `escrever` syscall: validates the pointer, prints the bytes and returns how many were written (or -14). |
+| `rodar_por_nome` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test helper: looks up the program by name and runs it. |
+| `Programa::codigo` | [usuario/programas.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/programas.rs) | The program's machine code bytes (a slice of `.rdata` between two labels). |
+| `procurar` | [usuario/programas.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/programas.rs) | Looks up a built-in program by name. |
+
+Automated tests (`#[test_case]`, run with `cargo test`, see doc 09):
+
+| Function | File | What it does |
+|---|---|---|
+| `ola_sai_com_42` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `ola` writes and exits with 42. |
+| `relogio_usa_syscall_de_tiques` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `relogio` waits 100 ticks through the syscall and exits with 100. |
+| `ponteiro_do_kernel_recusado` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `ponteiro` passes a kernel address, gets -14 and exits with 1. |
+| `invasor_encerrado_por_page_fault` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `invasor` (reads kernel memory) ends with #PF. |
+| `privilegiado_encerrado_por_gp` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `privilegiado` (`cli` in ring 3) ends with #GP. |
+| `laco_encerrado_pelo_timer` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `laco` (infinite loop) is killed by the timer. |
+| `nada_fica_mapeado_nem_vaza` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: after a warm-up, running `ola` leaves the program's addresses unmapped and the free frame count unchanged. |
+| `validacao_de_ponteiros` | [usuario/mod.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-10/src/usuario/mod.rs) | Test: `faixa_do_programa` accepts and rejects the right edge cases. |
+
+
+---
+
 ## Difference from the book
 
 The book ends at chapter 11, and section 11.4 lays out a roadmap: a RAM

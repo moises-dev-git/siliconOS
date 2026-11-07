@@ -348,6 +348,18 @@ QEMU e OVMF) estão na introdução, seção "Como compilar e rodar".
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `main` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | Ponto de entrada UEFI (`#[entry]`). Guarda o framebuffer e a RSDP, sai dos serviços de boot e chama `kernel_main`. |
+| `kernel_main` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | O kernel propriamente dito: inicializa cada subsistema na ordem e, no fim, fica num laço. Cada capítulo acrescenta um passo (GDT, IDT, memória, heap, interrupções; desde o doc 09, entrega o controle ao shell). Nunca retorna. |
+
+
+---
+
 ## Resumo
 
 - O **kernel** é o programa que controla o hardware e atende os pedidos de

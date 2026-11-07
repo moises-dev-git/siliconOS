@@ -279,6 +279,19 @@ no primeiro commit do repositório: o link de cada arquivo leva ao código
 
 ---
 
+## Funções deste capítulo
+
+Todas as funções que este capítulo acrescenta, em uma frase cada. As mais importantes foram explicadas no texto acima; esta tabela serve de mapa e de referência rápida. (Funções que já existiam e só mudaram aparecem em [Mudanças nos arquivos](#mudanças-nos-arquivos).)
+
+| Função | Arquivo | O que faz |
+|---|---|---|
+| `panic` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | O `#[panic_handler]`: desliga as interrupções, detecta panic dentro de panic, escreve os detalhes na serial e na tela (fundo vermelho, destravando o console à força) e para. (Desde o doc 09, em `cargo test`, sai do QEMU com código de falha.) |
+| `escrever_detalhes` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | Escreve mensagem, arquivo, linha e coluna do panic em qualquer destino que implemente `Write` (é chamada duas vezes: serial e tela). |
+| `parar` | [panic.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/panic.rs) | Laço eterno de `cli; hlt`: a CPU dorme e não acorda mais. |
+
+
+---
+
 ## Resumo
 
 - Um **panic** é um erro de lógica do programa (índice inválido, `unwrap`

@@ -345,6 +345,18 @@ OVMF) are in the introduction, section "How to build and run".
 
 ---
 
+## Functions in this chapter
+
+Every function this chapter adds, in one sentence each. The most important ones were explained in the text above; this table is a map and a quick reference. (Functions that already existed and only changed are listed in [Changes to the files](#changes-to-the-files).)
+
+| Function | File | What it does |
+|---|---|---|
+| `main` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | UEFI entry point (`#[entry]`). Saves the framebuffer and the RSDP, exits boot services and calls `kernel_main`. |
+| `kernel_main` | [main.rs](https://github.com/moises-dev-git/siliconOS/blob/doc-06/src/main.rs) | The kernel itself: initializes each subsystem in order and finally loops. Each chapter adds a step (GDT, IDT, memory, heap, interrupts; since doc 09 it hands control to the shell). Never returns. |
+
+
+---
+
 ## Summary
 
 - The **kernel** is the program that controls the hardware and serves the
