@@ -616,6 +616,7 @@ pass.
   (the `espacos` command proves it), but `rodar` still waits for the program
   to end. The next step, the **scheduler**, saves each program's state and
   alternates between them on the timer, switching CR3 at every switch.
+  *(Done in [doc 12](12-escalonador.md).)*
 - **No GLOBAL or PCID:** each CR3 switch empties the whole TLB, the kernel's
   translations included.
 - **New kernel entries do not propagate** (section 3.5).

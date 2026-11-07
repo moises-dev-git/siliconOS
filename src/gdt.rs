@@ -11,6 +11,7 @@
 //! segmento e o registrador de tarefa (`ltr`).
 
 use core::arch::asm;
+use core::cell::UnsafeCell;
 use core::mem::size_of;
 use spin::Once;
 
@@ -90,7 +91,14 @@ static mut PILHA_DOUBLE_FAULT: Pilha = Pilha([0; TAM_PILHA_IST]);
 /// Programas de usuário nunca a veem: a CPU troca de pilha sozinha.
 static mut PILHA_ANEL0: Pilha = Pilha([0; TAM_PILHA_IST]);
 
-static TSS: Once<Tss> = Once::new();
+/// A TSS fica numa `UnsafeCell` porque o RSP0 muda depois do boot: desde o
+/// doc 12, cada processo tem a sua pilha do kernel, e o escalonador troca o
+/// RSP0 a cada troca de processo (`definir_rsp0`).
+struct CelulaTss(UnsafeCell<Tss>);
+// Só o escalonador escreve, sempre com as interrupções desligadas.
+unsafe impl Sync for CelulaTss {}
+
+static TSS: Once<CelulaTss> = Once::new();
 static GDT: Once<[u64; 7]> = Once::new();
 
 /// Formato que `lgdt`/`sgdt` usam: limite (tamanho - 1) seguido da base.
@@ -115,7 +123,7 @@ fn descritor_tss(base: u64, limite: u64) -> (u64, u64) {
 }
 
 pub fn init() {
-    let tss = TSS.call_once(|| {
+    let tss = TSS.call_once(|| CelulaTss(UnsafeCell::new({
         // A pilha cresce para baixo: a CPU precisa do endereço do TOPO.
         let inicio = &raw const PILHA_DOUBLE_FAULT as u64;
         let mut ist = [0u64; 7];
@@ -130,11 +138,12 @@ pub fn init() {
             _reservado3: 0,
             iomap_base: size_of::<Tss>() as u16,
         }
-    });
+    })));
+    let tss = tss.0.get() as *const Tss;
 
     let gdt = GDT.call_once(|| {
         let (tss_baixo, tss_alto) =
-            descritor_tss(tss as *const Tss as u64, (size_of::<Tss>() - 1) as u64);
+            descritor_tss(tss as u64, (size_of::<Tss>() - 1) as u64);
         [
             0, // entrada 0: obrigatoriamente nula
             DESC_KERNEL_CODE,
@@ -214,10 +223,18 @@ pub fn estado() -> Estado {
 
 /// Topo da pilha usada ao vir do anel 3 (TSS.rsp[0]).
 pub fn topo_pilha_anel0() -> u64 {
-    TSS.get().map(|t| { let rsp = t.rsp; rsp[0] }).unwrap_or(0)
+    TSS.get().map(|t| unsafe { (&raw const (*t.0.get()).rsp as *const u64).read_unaligned() }).unwrap_or(0)
+}
+
+/// Troca a pilha que a CPU usa ao vir do anel 3 (TSS.rsp[0]). A CPU lê a
+/// TSS da memória a cada troca de anel, então vale já na próxima
+/// interrupção. (O campo não é alinhado: a TSS é `packed`.)
+pub fn definir_rsp0(topo: u64) {
+    let tss = TSS.get().expect("gdt::init antes de definir_rsp0");
+    unsafe { (&raw mut (*tss.0.get()).rsp as *mut u64).write_unaligned(topo) };
 }
 
 /// Endereço do topo da pilha IST de double fault (para exibir no boot).
 pub fn topo_pilha_double_fault() -> u64 {
-    TSS.get().map(|t| { let ist = t.ist; ist[(IST_DOUBLE_FAULT - 1) as usize] }).unwrap_or(0)
+    TSS.get().map(|t| { let ist = unsafe { (*t.0.get()).ist }; ist[(IST_DOUBLE_FAULT - 1) as usize] }).unwrap_or(0)
 }

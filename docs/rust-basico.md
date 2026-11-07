@@ -1033,3 +1033,42 @@ Detalhes que aparecem no SiliconOS:
   dono é outro".
 - O `MutexGuard` do `spin::Mutex` ([§11](#11-mutex-e-once-da-crate-spin)) usa o mesmo mecanismo: o `Drop`
   dele é que destrava o mutex.
+
+## 39. `UnsafeCell`: mutar através de uma referência compartilhada
+
+```rust
+struct CelulaTss(UnsafeCell<Tss>);
+unsafe impl Sync for CelulaTss {}
+
+static TSS: Once<CelulaTss> = Once::new();
+```
+
+A regra central do Rust ([§8](#8-referências-e-o-borrow-checker-versão-curtíssima)) é: ou **várias referências só de leitura**
+(`&T`), ou **uma só que pode escrever** (`&mut T`), nunca as duas. O
+compilador conta com isso para otimizar: se você tem um `&T`, ele pode
+assumir que o valor não muda enquanto a referência existir, guardar o
+valor num registrador e não ler de novo.
+
+Às vezes, porém, um valor precisa mudar mesmo sendo acessado por
+referência compartilhada: um `static` (que todo mundo enxerga) e que muda
+depois do boot, como o RSP0 da TSS (doc 12). Para isso existe a
+`UnsafeCell<T>`: o único jeito "oficial" de dizer ao compilador "o que está
+aqui dentro pode mudar por trás de um `&`; não faça suposições". Toda
+mutabilidade interior do Rust é construída em cima dela: `Cell`, `RefCell`,
+os atômicos (`AtomicU64`), e o próprio `spin::Mutex` ([§11](#11-mutex-e-once-da-crate-spin)).
+
+- `celula.get()` devolve um **ponteiro cru** `*mut T` para o conteúdo, a
+  partir de um `&UnsafeCell<T>`. Ler ou escrever por ele é `unsafe`: quem
+  escreve garante que ninguém mais está lendo ou escrevendo ao mesmo tempo.
+- Um `static` precisa ser `Sync` (seguro de compartilhar entre threads), e
+  `UnsafeCell` não é. Por isso o `unsafe impl Sync for CelulaTss {}`: uma
+  promessa nossa, justificada no comentário (só o escalonador escreve,
+  sempre com as interrupções desligadas, numa CPU só).
+- Por que não um `Mutex<Tss>`? Porque a **CPU** também lê a TSS, sozinha, a
+  cada interrupção vinda do anel 3; ela não sabe de lock nenhum. O que
+  precisamos é de um endereço fixo com conteúdo alterável, e é exatamente
+  isso que a `UnsafeCell` dá.
+
+Em Java, o equivalente aproximado seria um campo `volatile` que vários
+objetos leem e um só escreve; a diferença é que em Rust a necessidade tem
+que ser declarada no tipo.

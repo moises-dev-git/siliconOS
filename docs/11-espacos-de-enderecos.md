@@ -606,6 +606,7 @@ passando.
   vivos (o comando `espacos` prova), mas o `rodar` ainda espera o programa
   terminar. O próximo passo, o **escalonador**, guarda o estado de cada
   programa e alterna entre eles no timer, trocando o CR3 a cada troca.
+  *(Feito no [doc 12](12-escalonador.md).)*
 - **Sem GLOBAL nem PCID:** cada troca de CR3 esvazia a TLB inteira,
   inclusive as traduções do kernel.
 - **Entradas novas do kernel não se propagam** (seção 3.5).

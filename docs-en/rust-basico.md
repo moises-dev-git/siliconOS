@@ -1045,3 +1045,42 @@ Details that show up in SiliconOS:
   owner is someone else now".
 - The `MutexGuard` from `spin::Mutex` ([§11](#11-mutex-and-once-from-the-spin-crate)) uses the same mechanism: its
   `Drop` is what unlocks the mutex.
+
+## 39. `UnsafeCell`: mutating through a shared reference
+
+```rust
+struct CelulaTss(UnsafeCell<Tss>);
+unsafe impl Sync for CelulaTss {}
+
+static TSS: Once<CelulaTss> = Once::new();
+```
+
+Rust's central rule ([§8](#8-references-and-the-borrow-checker-very-short-version)) is: either **many read-only references** (`&T`)
+or **a single one that can write** (`&mut T`), never both. The compiler
+relies on it to optimize: if you hold a `&T`, it may assume the value does
+not change while the reference exists, keep the value in a register and
+never read it again.
+
+Sometimes, though, a value must change even though it is reached through a
+shared reference: a `static` (which everyone sees) that changes after boot,
+like the TSS's RSP0 (doc 12). That is what `UnsafeCell<T>` is for: the only
+"official" way to tell the compiler "what is in here may change behind a
+`&`; make no assumptions". All of Rust's interior mutability is built on
+it: `Cell`, `RefCell`, the atomics (`AtomicU64`), and `spin::Mutex` itself
+([§11](#11-mutex-and-once-from-the-spin-crate)).
+
+- `cell.get()` returns a **raw pointer** `*mut T` to the contents, from a
+  `&UnsafeCell<T>`. Reading or writing through it is `unsafe`: whoever
+  writes guarantees that nobody else is reading or writing at the same time.
+- A `static` must be `Sync` (safe to share between threads), and
+  `UnsafeCell` is not. Hence the `unsafe impl Sync for CelulaTss {}`: a
+  promise of ours, justified in the comment (only the scheduler writes,
+  always with interrupts off, on a single CPU).
+- Why not a `Mutex<Tss>`? Because the **CPU** also reads the TSS, on its
+  own, on every interrupt coming from ring 3; it knows nothing about locks.
+  What we need is a fixed address with changeable contents, and that is
+  exactly what `UnsafeCell` gives.
+
+In Java, the rough equivalent would be a `volatile` field that many objects
+read and one writes; the difference is that in Rust the need has to be
+declared in the type.

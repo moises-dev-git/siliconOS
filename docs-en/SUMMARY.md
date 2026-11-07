@@ -16,6 +16,7 @@
 - [09: Shell and tests](09-shell-e-testes.md)
 - [10: User mode](10-modo-usuario.md)
 - [11: Address spaces](11-espacos-de-enderecos.md)
+- [12: The scheduler](12-escalonador.md)
 
 # Reference
 

@@ -33,6 +33,7 @@ OS or programmed in Rust. Each chapter's comments live in the
 | Shell, `cargo test` inside QEMU, debugging with GDB | `src/shell.rs`, `src/testes.rs` | [09](docs-en/09-shell-e-testes.md) |
 | User mode: programs in ring 3, system calls (`int 0x80`) | `src/usuario/` | [10](docs-en/10-modo-usuario.md) |
 | One address space (PML4) per program | `src/memoria/espaco.rs` | [11](docs-en/11-espacos-de-enderecos.md) |
+| Preemptive scheduler: several programs at once | `src/escalonador.rs` | [12](docs-en/12-escalonador.md) |
 
 ## Running
 

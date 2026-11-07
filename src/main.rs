@@ -26,6 +26,7 @@ mod shell;
 #[cfg(test)]
 mod testes;
 mod usuario;
+mod escalonador;
 
 use core::fmt::Write;
 use spin::Mutex;
@@ -192,6 +193,11 @@ fn kernel_main(fb: FrameBuffer, memory_map: &impl MemoryMap) -> ! {
         kprintln!("Testando panic: acessando v[{}]...", i);
         kprintln!("{}", v[i]);
     }
+
+    // ---- Escalonador (docs/12-escalonador.md) ----
+    // Antes das interrupções: o primeiro tique já chama o escalonador. O
+    // código que está rodando agora vira o processo 0.
+    escalonador::init();
 
     // ---- Interrupções de hardware (docs/08-interrupcoes-de-hardware.md) ----
     interrupcoes::init();

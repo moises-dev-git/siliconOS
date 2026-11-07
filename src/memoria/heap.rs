@@ -351,15 +351,16 @@ pub fn init() {
 }
 
 pub fn estatisticas() -> Estatisticas {
-    HEAP.lock().as_ref().expect("heap nao inicializado").estatisticas()
+    // Interrupções desligadas, como em alloc/dealloc (docs 08 e 12).
+    crate::cpu::sem_interrupcoes(|| HEAP.lock().as_ref().expect("heap nao inicializado").estatisticas())
 }
 
 /// O endereço pertence à faixa já mapeada do heap?
 pub fn contem(endereco: u64) -> bool {
-    match HEAP.lock().as_ref() {
+    crate::cpu::sem_interrupcoes(|| match HEAP.lock().as_ref() {
         Some(h) => endereco >= HEAP_INICIO && endereco < h.fim,
         None => false,
-    }
+    })
 }
 
 #[cfg(test)]

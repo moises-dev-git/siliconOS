@@ -18,6 +18,7 @@ use spin::Mutex;
 
 use super::mapa::{Mapa, Tipo};
 use super::{INICIO_UTILIZAVEL, TAMANHO_QUADRO};
+use crate::cpu;
 
 /// Endereço físico de um quadro. Um tipo próprio (em vez de u64 solto) para
 /// o compilador não deixar misturar "endereço físico" com "um número qualquer".
@@ -192,16 +193,19 @@ pub fn reposicionar_bitmap(deslocamento: u64) {
 }
 
 /// Atalhos para usar o alocador global sem lidar com o Mutex/Option.
+/// Com as interrupções desligadas (desde o doc 12): com o escalonador, o
+/// timer pode trocar de processo a qualquer momento; se trocasse com o lock
+/// preso, o próximo que pedisse um quadro ficaria girando para sempre.
 pub fn alocar() -> Option<Quadro> {
-    QUADROS.lock().as_mut().expect("alocador de quadros nao inicializado").alocar()
+    cpu::sem_interrupcoes(|| QUADROS.lock().as_mut().expect("alocador de quadros nao inicializado").alocar())
 }
 
 pub fn liberar(quadro: Quadro) {
-    QUADROS.lock().as_mut().expect("alocador de quadros nao inicializado").liberar(quadro)
+    cpu::sem_interrupcoes(|| QUADROS.lock().as_mut().expect("alocador de quadros nao inicializado").liberar(quadro))
 }
 
 pub fn livres() -> usize {
-    QUADROS.lock().as_ref().map_or(0, |a| a.livres())
+    cpu::sem_interrupcoes(|| QUADROS.lock().as_ref().map_or(0, |a| a.livres()))
 }
 
 #[cfg(test)]

@@ -103,6 +103,38 @@ global_asm!(
     "    int 0x80",
     "programa_relogio_fim:",
 
+    // ---- contador: escreve o próprio pid 5 vezes, esperando 50 tiques entre elas (doc 12) ----
+    ".global programa_contador_inicio",
+    ".global programa_contador_fim",
+    "programa_contador_inicio:",
+    "    mov eax, 3",               // pid()
+    "    int 0x80",
+    "    xor edx, edx",
+    "    mov ecx, 10",
+    "    div rcx",                  // rdx = pid % 10 (o último dígito)
+    "    add dl, 0x30",             // vira o caractere ASCII ('0' = 0x30)
+    "    sub rsp, 16",              // 2 bytes na pilha do programa: dígito e espaço
+    "    mov byte ptr [rsp], dl",
+    "    mov byte ptr [rsp + 1], 0x20",
+    "    mov r12d, 5",              // 5 vezes (int 0x80 preserva tudo menos rax)
+    "3:  mov rdi, rsp",
+    "    mov esi, 2",
+    "    mov eax, 1",               // escrever(rsp, 2)
+    "    int 0x80",
+    "    mov eax, 2",               // tiques()
+    "    int 0x80",
+    "    lea rbx, [rax + 50]",      // espera 50 tiques (500 ms)
+    "4:  mov eax, 2",
+    "    int 0x80",
+    "    cmp rax, rbx",
+    "    jb 4b",
+    "    dec r12d",
+    "    jnz 3b",
+    "    xor edi, edi",             // sair(0)
+    "    xor eax, eax",
+    "    int 0x80",
+    "programa_contador_fim:",
+
     ".text",
 );
 
@@ -119,6 +151,8 @@ unsafe extern "C" {
     static programa_laco_fim: u8;
     static programa_relogio_inicio: u8;
     static programa_relogio_fim: u8;
+    static programa_contador_inicio: u8;
+    static programa_contador_fim: u8;
 }
 
 pub struct Programa {
@@ -138,7 +172,7 @@ impl Programa {
     }
 }
 
-pub static PROGRAMAS: [Programa; 6] = [
+pub static PROGRAMAS: [Programa; 7] = [
         Programa { nome: "ola", descricao: "escreve uma mensagem e sai com codigo 42",
                    inicio: &raw const programa_ola_inicio, fim: &raw const programa_ola_fim },
         Programa { nome: "relogio", descricao: "espera 1 s perguntando os tiques ao kernel",
@@ -149,8 +183,10 @@ pub static PROGRAMAS: [Programa; 6] = [
                    inicio: &raw const programa_invasor_inicio, fim: &raw const programa_invasor_fim },
         Programa { nome: "privilegiado", descricao: "tenta executar cli",
                    inicio: &raw const programa_privilegiado_inicio, fim: &raw const programa_privilegiado_fim },
-        Programa { nome: "laco", descricao: "laco infinito (o timer o encerra em 2 s)",
+        Programa { nome: "laco", descricao: "laco infinito (o timer o encerra depois de 2 s de CPU)",
                    inicio: &raw const programa_laco_inicio, fim: &raw const programa_laco_fim },
+        Programa { nome: "contador", descricao: "escreve o proprio pid 5 vezes, a cada 500 ms",
+                   inicio: &raw const programa_contador_inicio, fim: &raw const programa_contador_fim },
 ];
 
 pub fn procurar(nome: &str) -> Option<&'static Programa> {

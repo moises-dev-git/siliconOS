@@ -118,6 +118,27 @@ Cada tabela ocupa um quadro de 4 KiB e tem 512 entradas (doc 06).
 de tabelas de página com a sua PML4. No SiliconOS, cada programa tem o seu,
 e todos compartilham as entradas do kernel (doc 11).
 
+**Processo**
+: Um programa em execução, com tudo o que precisa para continuar de onde
+parou: espaço de endereços, pilha do kernel e registradores salvos (doc 12).
+
+**Contexto / troca de contexto** (*context switch*)
+: O estado da CPU que pertence a um processo (registradores, RSP, CR3).
+Trocar de contexto é guardar o de um processo e carregar o de outro (doc 12).
+
+**Escalonador** (*scheduler*)
+: A parte do kernel que decide qual processo roda agora. O do SiliconOS
+faz rodízio (*round robin*): um tique para cada processo pronto (doc 12).
+
+**Preempção** (*preemption*)
+: Tirar a CPU de um processo sem que ele peça, normalmente no tratador do
+timer. O contrário é a troca **cooperativa**, em que o processo devolve a
+CPU quando quer (doc 12).
+
+**Processo zumbi** (*zombie*)
+: Um processo que já terminou, mas continua na tabela até alguém ler o
+resultado e liberar a memória dele (doc 12).
+
 **Página grande** (*huge page*)
 : Página de 2 MiB ou 1 GiB, que interrompe a caminhada pelas tabelas mais
 cedo. Economiza tabelas e entradas de TLB.

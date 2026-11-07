@@ -62,6 +62,7 @@ book and then the matching document.
 | [09: Shell and tests](09-shell-e-testes.md) | Interactive shell, `cargo test` in QEMU, debugging with GDB | 10 | ✅ |
 | [10: User mode](10-modo-usuario.md) | Ring 3, `iretq`, system calls (`int 0x80`), isolated programs | 11.4 | ✅ |
 | [11: Address spaces](11-espacos-de-enderecos.md) | One PML4 per program, shared kernel, CR3 switch, a `Drop` that returns the frames | 11.4 | ✅ |
+| [12: The scheduler](12-escalonador.md) | Processes, context switch, a kernel stack per process, timer preemption, `ps` and `&` | 11.4 | ✅ |
 | [Rust for people who already program](rust-basico.md) | Rust reference | — | ✅ |
 | [Glossary](glossario.md) | Term reference | — | ✅ |
 

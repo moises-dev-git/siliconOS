@@ -16,6 +16,7 @@
 - [09: Shell e testes](09-shell-e-testes.md)
 - [10: Modo usuário](10-modo-usuario.md)
 - [11: Espaços de endereços](11-espacos-de-enderecos.md)
+- [12: O escalonador](12-escalonador.md)
 
 # Referência
 

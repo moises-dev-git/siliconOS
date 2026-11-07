@@ -3,32 +3,33 @@
 //!
 //! Explicação completa em docs/10-modo-usuario.md.
 //!
-//! O ciclo de vida de um programa:
+//! O ciclo de vida de um programa (desde o doc 12, com o escalonador):
 //!
 //!   shell: rodar ola
-//!     └─ rodar()                       cria um espaço de endereços (doc 11), mapeia
-//!                                      código e pilha com o bit USUARIO, ativa o espaço
-//!          └─ entrar_no_anel3()        salva o RSP do kernel, monta um quadro e faz iretq
-//!               ═══════ anel 3 ═══════ o programa roda; int 0x80 = chamada de sistema
-//!               ◄─ voltar_ao_kernel()  restaura o RSP salvo: entrar_no_anel3 "retorna"
-//!     └─ rodar()                       volta ao CR3 do kernel, destrói o espaço, informa o resultado
+//!     └─ iniciar()                     cria um espaço de endereços (doc 11), mapeia código e
+//!                                      pilha com o bit USUARIO, entrega ao escalonador
+//!     └─ escalonador::esperar(pid)     cede a CPU até o programa terminar
+//!               ═══════ anel 3 ═══════ o programa roda quando é a vez dele; int 0x80 = chamada
+//!                                      de sistema; o timer o troca pelos outros a cada tique
+//!     └─ recolher                      destrói a pilha e o espaço, devolve o resultado
 //!
-//! O programa termina por um de três caminhos, e todos acabam em `encerrar`:
-//! a chamada `sair`, uma exceção da CPU no anel 3, ou o timer (tempo esgotado).
+//! O programa termina por um de três caminhos, e todos acabam em
+//! `escalonador::encerrar`: a chamada `sair`, uma exceção da CPU no anel 3,
+//! ou o timer (tempo de CPU esgotado).
 
 pub mod programas;
 
+use alloc::format;
+use alloc::string::String;
 use core::arch::naked_asm;
-use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use spin::Mutex;
 
-use crate::gdt;
+use crate::escalonador::{self, Pid};
 use crate::idt::QuadroInterrupcao;
 use crate::interrupcoes::timer;
 use crate::memoria::espaco::EspacoEnderecos;
 use crate::memoria::paginacao::{self, flags};
 use crate::memoria::{quadros, TAMANHO_QUADRO};
-use crate::{cpu, kprint, kprintln};
+use crate::{kprint, kprintln};
 
 /// Onde o código do programa fica (entrada 64 da PML4, metade baixa: nada
 /// do kernel mora ali).
@@ -36,13 +37,14 @@ pub const CODIGO_VIRT: u64 = 0x0000_2000_0000_0000;
 /// A página da pilha do programa; a pilha começa no fim dela.
 pub const PILHA_VIRT: u64 = 0x0000_2000_0010_0000;
 pub const VETOR_SYSCALL: u8 = 0x80;
-/// Um programa que passar disto sem devolver a CPU é encerrado pelo timer.
+/// Tempo de CPU (tiques no anel 3) além do qual o programa é encerrado.
 pub const LIMITE_TIQUES: u64 = 2 * timer::FREQUENCIA_HZ;
 
 // Números das chamadas de sistema (RAX).
 pub const SYS_SAIR: u64 = 0;
 pub const SYS_ESCREVER: u64 = 1;
 pub const SYS_TIQUES: u64 = 2;
+pub const SYS_PID: u64 = 3;
 
 // Erros devolvidos em RAX, negativos como no Linux.
 pub const ERRO_ENDERECO: u64 = -14i64 as u64;  // EFAULT: ponteiro inválido
@@ -59,29 +61,34 @@ pub enum Resultado {
     TempoEsgotado,
 }
 
-/// Há um programa rodando agora?
-static ATIVO: AtomicBool = AtomicBool::new(false);
-static INICIO: AtomicU64 = AtomicU64::new(0);
-static RESULTADO: Mutex<Option<Resultado>> = Mutex::new(None);
-
-/// RSP do kernel no momento em que entrou no anel 3 (lido por voltar_ao_kernel).
-static mut RSP_KERNEL: u64 = 0;
+/// Texto curto que descreve como um programa terminou (shell e escalonador).
+pub fn descrever(r: Resultado) -> String {
+    match r {
+        Resultado::Saiu(codigo) => format!("terminou: codigo de saida {}", codigo as i64),
+        Resultado::Falha { excecao, rip } => format!("encerrado pelo kernel: {} em {:#x}", excecao, rip),
+        Resultado::TempoEsgotado => format!("encerrado pelo kernel: usou {} s de CPU sem terminar",
+                                            LIMITE_TIQUES / timer::FREQUENCIA_HZ),
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Rodar um programa
 // ---------------------------------------------------------------------------
 
-pub fn rodar(programa: &programas::Programa) -> Resultado {
+/// Prepara o programa num espaço de endereços próprio e o entrega ao
+/// escalonador. Volta na hora, com o pid; o programa roda quando chegar a
+/// vez dele (doc 12).
+pub fn iniciar(programa: &programas::Programa, segundo_plano: bool) -> Pid {
     let codigo = programa.codigo();
     assert!(codigo.len() <= TAMANHO_QUADRO as usize, "programa maior que uma pagina");
 
-    // 1. Um espaço de endereços só deste programa (doc 11): uma PML4 nova,
-    //    com o kernel copiado e a metade do programa vazia.
+    // Um espaço de endereços só deste programa (doc 11): uma PML4 nova,
+    // com o kernel copiado e a metade do programa vazia.
     let mut espaco = EspacoEnderecos::novo().expect("sem quadros para a PML4 do programa");
 
-    // 2. Uma página de código (só leitura, executável) e uma de pilha
-    //    (escrita, sem execução), as duas acessíveis pelo anel 3. O espaço
-    //    fica dono dos quadros.
+    // Uma página de código (só leitura, executável) e uma de pilha
+    // (escrita, sem execução), as duas acessíveis pelo anel 3. O espaço
+    // fica dono dos quadros.
     let q_codigo = nova_pagina_zerada();
     unsafe {
         let destino = paginacao::fisico_para_virtual(q_codigo.endereco()) as *mut u8;
@@ -91,23 +98,13 @@ pub fn rodar(programa: &programas::Programa) -> Resultado {
     espaco.mapear(PILHA_VIRT, nova_pagina_zerada(),
                   flags::USUARIO | flags::ESCRITA | flags::SEM_EXECUCAO).expect("mapear a pilha");
 
-    // 3. Ativar o espaço (CR3) e entrar no anel 3. Só volta quando o
-    //    programa terminar.
-    *RESULTADO.lock() = None;
-    INICIO.store(timer::tiques(), Ordering::Relaxed);
-    ATIVO.store(true, Ordering::Relaxed);
-    espaco.ativar();
-    unsafe { entrar_no_anel3(CODIGO_VIRT, PILHA_VIRT + TAMANHO_QUADRO) };
-    // De volta: as tabelas ativas ainda são as do programa. Voltar às do
-    // kernel ANTES de destruir as do programa.
-    paginacao::ativar(paginacao::raiz_kernel());
-    ATIVO.store(false, Ordering::Relaxed);
-    // Voltamos de dentro de um tratador (interrupções desligadas).
-    cpu::ligar_interrupcoes();
+    escalonador::criar(programa.nome, espaco, CODIGO_VIRT, PILHA_VIRT + TAMANHO_QUADRO, segundo_plano)
+}
 
-    // 4. Limpar: destruir o espaço devolve páginas, tabelas e a PML4.
-    drop(espaco);
-    RESULTADO.lock().take().expect("programa terminou sem resultado")
+/// Roda o programa e espera ele terminar (o que o shell faz sem `&`).
+pub fn rodar(programa: &programas::Programa) -> Resultado {
+    let pid = iniciar(programa, false);
+    escalonador::esperar(pid)
 }
 
 fn nova_pagina_zerada() -> quadros::Quadro {
@@ -118,75 +115,13 @@ fn nova_pagina_zerada() -> quadros::Quadro {
     q
 }
 
-/// Termina o programa atual e volta para dentro de `rodar`. Chamada de um
-/// tratador (de syscall, de exceção ou do timer), com o anel 3 interrompido.
-pub fn encerrar(resultado: Resultado) -> ! {
-    *RESULTADO.lock() = Some(resultado);
-    unsafe { voltar_ao_kernel() }
-}
-
 /// Chamada pelos tratadores de exceção (idt.rs): se a exceção aconteceu no
 /// anel 3, a culpa é do programa, não do kernel. Encerra só o programa.
 pub fn falha_do_programa(quadro: &QuadroInterrupcao, excecao: &'static str, detalhes: core::fmt::Arguments) {
     if quadro.cs & 3 == 3 {
         kprintln!("[kernel] {} no programa (RIP={:#x}, CS={:#x}): {}", excecao, quadro.rip, quadro.cs, detalhes);
-        encerrar(Resultado::Falha { excecao, rip: quadro.rip });
+        escalonador::encerrar(Resultado::Falha { excecao, rip: quadro.rip });
     }
-}
-
-/// Chamada pelo tratador do timer: o programa já passou do limite?
-pub fn tempo_esgotado(quadro: &QuadroInterrupcao) -> bool {
-    quadro.cs & 3 == 3
-        && ATIVO.load(Ordering::Relaxed)
-        && timer::tiques() - INICIO.load(Ordering::Relaxed) >= LIMITE_TIQUES
-}
-
-// ---------------------------------------------------------------------------
-// A troca de anel (assembly)
-// ---------------------------------------------------------------------------
-
-/// Salva o estado do kernel e "volta" de uma interrupção que nunca
-/// aconteceu: o `iretq` desempilha um quadro montado à mão, com CS e SS do
-/// anel 3, e a CPU passa a executar `rip` com privilégio de usuário.
-///
-/// `extern "sysv64"`: convenção de chamada do Linux (argumentos em RDI e
-/// RSI), escolhida explicitamente porque o alvo UEFI usa a do Windows.
-#[unsafe(naked)]
-unsafe extern "sysv64" fn entrar_no_anel3(rip: u64, rsp: u64) -> u64 {
-    naked_asm!(
-        // Registradores que a convenção manda preservar: voltar_ao_kernel os restaura.
-        "push rbx", "push rbp", "push r12", "push r13", "push r14", "push r15",
-        "mov [rip + {rsp_kernel}], rsp",
-        // O quadro que o iretq espera, de baixo para cima: RIP, CS, RFLAGS, RSP, SS.
-        "push {ss}",
-        "push rsi",
-        "push {rflags}",
-        "push {cs}",
-        "push rdi",
-        // Não deixar valores do kernel nos registradores para o programa ver.
-        "xor eax, eax", "xor ebx, ebx", "xor ecx, ecx", "xor edx, edx",
-        "xor esi, esi", "xor edi, edi", "xor ebp, ebp",
-        "xor r8d, r8d", "xor r9d, r9d", "xor r10d, r10d", "xor r11d, r11d",
-        "xor r12d, r12d", "xor r13d, r13d", "xor r14d, r14d", "xor r15d, r15d",
-        "iretq",
-        rsp_kernel = sym RSP_KERNEL,
-        ss = const gdt::USER_DATA as u64,
-        cs = const gdt::USER_CODE as u64,
-        rflags = const 0x202u64, // bit 9 (IF): o programa roda com interrupções ligadas
-    )
-}
-
-/// O caminho de volta: descarta a pilha do tratador atual, restaura o RSP
-/// salvo por entrar_no_anel3 e retorna como se ela tivesse terminado.
-#[unsafe(naked)]
-unsafe extern "sysv64" fn voltar_ao_kernel() -> ! {
-    naked_asm!(
-        "mov rsp, [rip + {rsp_kernel}]",
-        "pop r15", "pop r14", "pop r13", "pop r12", "pop rbp", "pop rbx",
-        "xor eax, eax",
-        "ret",
-        rsp_kernel = sym RSP_KERNEL,
-    )
 }
 
 // ---------------------------------------------------------------------------
@@ -224,9 +159,10 @@ pub extern "sysv64" fn entrada_syscall() {
 
 extern "sysv64" fn tratar_syscall(r: &mut Registros) {
     r.rax = match r.rax {
-        SYS_SAIR => encerrar(Resultado::Saiu(r.rdi)),
+        SYS_SAIR => escalonador::encerrar(Resultado::Saiu(r.rdi)),
         SYS_ESCREVER => escrever(r.rdi, r.rsi),
         SYS_TIQUES => timer::tiques(),
+        SYS_PID => escalonador::pid_atual() as u64,
         _ => ERRO_SYSCALL,
     };
 }

@@ -34,13 +34,6 @@ pub fn milissegundos() -> u64 {
 pub extern "x86-interrupt" fn tratador(quadro: QuadroInterrupcao) {
     let t = TIQUES.fetch_add(1, Ordering::Relaxed) + 1;
 
-    // Interrompemos um programa de usuário que já passou do limite? Então o
-    // kernel retoma a CPU e o encerra (docs/10-modo-usuario.md).
-    if crate::usuario::tempo_esgotado(&quadro) {
-        apic::eoi();
-        crate::usuario::encerrar(crate::usuario::Resultado::TempoEsgotado);
-    }
-
     // `./run.sh teste-print-interrupcao`: imprimir de DENTRO do tratador.
     #[cfg(feature = "teste-print-interrupcao")]
     if t % 10 == 0 {
@@ -52,6 +45,11 @@ pub extern "x86-interrupt" fn tratador(quadro: QuadroInterrupcao) {
     // estamos tratando esta interrupção e não entrega mais nenhuma.
     #[cfg(not(feature = "teste-sem-eoi"))]
     apic::eoi();
+
+    // A vez do próximo processo (docs/12-escalonador.md). Depois do EOI:
+    // este tratador só termina quando este processo voltar a rodar, e até
+    // lá o APIC precisa continuar entregando tiques.
+    crate::escalonador::tique(&quadro);
 }
 
 // ---------------------------------------------------------------------------

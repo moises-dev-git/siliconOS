@@ -9,6 +9,7 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::escalonador;
 use crate::interrupcoes::{self, teclado, timer};
 use crate::memoria::{self, heap, quadros};
 use crate::{cpu, kprint, kprintln};
@@ -65,7 +66,15 @@ pub fn rodar() -> ! {
                 shell.tecla(c);
             }
         }
-        teclado::esperar();
+        // Liberar a memória dos programas de segundo plano que terminaram,
+        // e dar a CPU a eles enquanto ninguém digita (doc 12). Sem nenhum
+        // outro processo pronto, dormir até a próxima interrupção.
+        escalonador::recolher_segundo_plano();
+        if escalonador::ha_outros_prontos() {
+            escalonador::ceder();
+        } else {
+            teclado::esperar();
+        }
     }
 }
 
@@ -94,7 +103,8 @@ pub const COMANDOS: &[Comando] = &[
     Comando { nome: "ler", uso: "ler <endereco>", descricao: "le 8 bytes da memoria (pode dar page fault!)", funcao: ler },
     Comando { nome: "programas", uso: "programas", descricao: "lista os programas de usuario", funcao: programas },
     Comando { nome: "espacos", uso: "espacos", descricao: "dois espacos de enderecos, mesmo endereco, bytes diferentes", funcao: espacos },
-    Comando { nome: "rodar", uso: "rodar <programa>", descricao: "roda um programa no anel 3", funcao: rodar_programa },
+    Comando { nome: "rodar", uso: "rodar <programa> [&]", descricao: "roda um programa no anel 3 (& = segundo plano)", funcao: rodar_programa },
+    Comando { nome: "ps", uso: "ps", descricao: "lista os processos", funcao: ps },
     Comando { nome: "reiniciar", uso: "reiniciar", descricao: "reinicia a maquina", funcao: reiniciar },
     Comando { nome: "desligar", uso: "desligar", descricao: "desliga a maquina (ACPI; testado so no QEMU)", funcao: desligar },
 ];
@@ -153,7 +163,7 @@ fn tempo(_: &[&str]) {
 }
 
 fn mem(_: &[&str]) {
-    let total = quadros::QUADROS.lock().as_ref().map_or(0, |a| a.total());
+    let total = crate::cpu::sem_interrupcoes(|| quadros::QUADROS.lock().as_ref().map_or(0, |a| a.total()));
     let livres = quadros::livres();
     kprintln!("quadros: {} livres de {} ({} MiB livres)",
               livres, total, livres as u64 * memoria::TAMANHO_QUADRO / (1024 * 1024));
@@ -263,19 +273,33 @@ fn espacos(_: &[&str]) {
 } // `criados` é destruído aqui: PML4, tabelas e páginas voltam ao alocador
 
 fn rodar_programa(argumentos: &[&str]) {
-    use crate::usuario::{self, Resultado};
+    use crate::usuario;
     let Some(programa) = argumentos.first().and_then(|n| usuario::programas::procurar(n)) else {
-        kprintln!("uso: rodar <programa>   (veja 'programas')");
+        kprintln!("uso: rodar <programa> [&]   (veja 'programas')");
         return;
     };
-    match usuario::rodar(programa) {
-        Resultado::Saiu(codigo) =>
-            kprintln!("'{}' terminou: codigo de saida {}", programa.nome, codigo as i64),
-        Resultado::Falha { excecao, rip } =>
-            kprintln!("'{}' encerrado pelo kernel: {} em {:#x}", programa.nome, excecao, rip),
-        Resultado::TempoEsgotado =>
-            kprintln!("'{}' encerrado pelo kernel: passou de {} s sem terminar",
-                      programa.nome, usuario::LIMITE_TIQUES / timer::FREQUENCIA_HZ),
+    if argumentos.get(1) == Some(&"&") {
+        // Segundo plano (doc 12): o shell não espera. Quando o programa
+        // terminar, o escalonador imprime o resultado.
+        let pid = usuario::iniciar(programa, true);
+        kprintln!("[{}] '{}' em segundo plano", pid, programa.nome);
+    } else {
+        let r = usuario::rodar(programa);
+        kprintln!("'{}' {}", programa.nome, usuario::descrever(r));
+    }
+}
+
+/// Comando `ps` (doc 12): a tabela de processos.
+fn ps(_: &[&str]) {
+    use crate::escalonador::Estado;
+    kprintln!("  PID  ESTADO      CPU (tiques)  NOME");
+    for (pid, nome, estado, tiques) in escalonador::listar() {
+        let estado = match estado {
+            Estado::Pronto => "pronto",
+            Estado::Rodando => "rodando",
+            Estado::Terminado(_) => "terminado",
+        };
+        kprintln!("  {:>3}  {:<10}  {:>12}  {}", pid, estado, tiques, nome);
     }
 }
 

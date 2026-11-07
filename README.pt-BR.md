@@ -29,6 +29,7 @@ programou em Rust. Os comentários de cada capítulo ficam nas
 | Shell, `cargo test` dentro do QEMU, depuração com GDB | `src/shell.rs`, `src/testes.rs` | [09](docs/09-shell-e-testes.md) |
 | Modo usuário: programas no anel 3, chamadas de sistema (`int 0x80`) | `src/usuario/` | [10](docs/10-modo-usuario.md) |
 | Um espaço de endereços (PML4) por programa | `src/memoria/espaco.rs` | [11](docs/11-espacos-de-enderecos.md) |
+| Escalonador preemptivo: vários programas ao mesmo tempo | `src/escalonador.rs` | [12](docs/12-escalonador.md) |
 
 ## Rodar
 

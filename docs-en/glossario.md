@@ -118,6 +118,27 @@ Switching CR3 switches the whole address space.
 page table tree with its own PML4. In SiliconOS each program has its own,
 and they all share the kernel's entries (doc 11).
 
+**Process**
+: A running program, with everything it needs to continue where it left
+off: address space, kernel stack and saved registers (doc 12).
+
+**Context / context switch**
+: The CPU state that belongs to a process (registers, RSP, CR3). A context
+switch saves one process's context and loads another's (doc 12).
+
+**Scheduler**
+: The part of the kernel that decides which process runs now. SiliconOS's
+does round robin: one tick for each ready process (doc 12).
+
+**Preemption**
+: Taking the CPU away from a process without it asking, usually in the
+timer handler. The opposite is **cooperative** switching, where the process
+gives the CPU back when it wants to (doc 12).
+
+**Zombie process**
+: A process that has already ended but stays in the table until someone
+reads its result and frees its memory (doc 12).
+
 **Huge page**
 : A 2 MiB or 1 GiB page, which stops the walk through the tables earlier.
 It saves tables and TLB entries.
