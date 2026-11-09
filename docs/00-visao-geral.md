@@ -294,7 +294,7 @@ doc 04.
 
 ---
 
-## 5. Por que tem tanto `unsafe`
+## 5. Por que tem tanto `unsafe`?
 
 Rust garante, em tempo de compilação, que você não vai acessar memória
 inválida, desde que o compilador consiga **provar** que o acesso é válido.
