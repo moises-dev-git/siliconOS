@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 python3 indice_funcoes.py   # docs*/funcoes.md a partir das tabelas / from the tables
+python3 simbolos.py        # simbolos.js: links do código para o GitHub / code links to GitHub
 mdbook build          # pt-BR -> book/
 mdbook build en       # en    -> book/en/
 wrangler pages deploy book --project-name siliconos --branch main --commit-dirty=true

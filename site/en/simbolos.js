@@ -1,0 +1,1 @@
+../simbolos.js

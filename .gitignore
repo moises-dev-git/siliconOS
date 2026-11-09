@@ -15,3 +15,6 @@ CLAUDE.md
 # Backups locais
 /src/main (cópia).rs
 /main_etapa0_backup.rs
+
+# Gerado pelo site/simbolos.py (roda no publicar.sh)
+/site/simbolos.js
